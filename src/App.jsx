@@ -1,0 +1,364 @@
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+
+const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+const addBiz = (d, n) => { let r = new Date(d), a = 0, dir = n >= 0 ? 1 : -1; while (a < Math.abs(n)) { r.setDate(r.getDate() + dir); if (r.getDay() !== 0 && r.getDay() !== 6) a++; } return r; };
+const diffD = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
+const isWE = d => { const x = new Date(d); return x.getDay() === 0 || x.getDay() === 6; };
+const fmtD = d => { const x = new Date(d); return (x.getMonth()+1)+"/"+x.getDate(); };
+const fmtDF = d => { const x = new Date(d); return x.getFullYear()+"/"+(x.getMonth()+1)+"/"+x.getDate(); };
+const fmtISO = d => { const x = new Date(d); return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0"); };
+const same = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+const getMon = d => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() - day + (day === 0 ? -6 : 1)); return x; };
+const DN = ["日","月","火","水","木","金","土"];
+const MN = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
+const timeNow = () => { const d = new Date(); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); };
+
+const TEAM = [
+  { id:"shimizu",name:"清水",role:"営業・全体統括",color:"#6366f1",hpw:40,av:"清" },
+  { id:"imashige",name:"今重",role:"コンテンツ・企画",color:"#f59e0b",hpw:40,av:"今" },
+  { id:"fujii",name:"藤井",role:"デザイン・撮影",color:"#10b981",hpw:40,av:"藤" },
+  { id:"nishitani",name:"西谷",role:"エンジニアリング",color:"#ef4444",hpw:40,av:"西" },
+  { id:"honda",name:"本田",role:"ディレクター(パート)",color:"#8b5cf6",hpw:20,av:"本" },
+];
+const PH = {
+  sales:{l:"営業・ヒアリング",c:"#6366f1"},kickoff:{l:"キックオフ",c:"#8b5cf6"},wire:{l:"ワイヤーフレーム",c:"#f59e0b"},writing:{l:"ライティング",c:"#f97316"},design:{l:"デザイン",c:"#10b981"},photo:{l:"撮影",c:"#14b8a6"},coding:{l:"コーディング",c:"#ef4444"},test:{l:"テスト・検証",c:"#ec4899"},delivery:{l:"納品",c:"#06b6d4"},review:{l:"お客様確認",c:"#64748b"},ad:{l:"広告運用",c:"#7c3aed"},
+};
+const PH_KEYS = Object.keys(PH);
+const MIN_DW = 1.5, MAX_DW = 60, DEFAULT_DW = 40;
+const getZL = dw => dw >= 25 ? "day" : dw >= 8 ? "week" : "month";
+const getZLbl = dw => ({day:"日",week:"週",month:"月"})[getZL(dw)] || "月";
+
+const genProjects = () => {
+  const td = new Date(); td.setHours(0,0,0,0);
+  const cp = (id,nm,cl,st,off,ts) => ({ id,name:nm,client:cl,status:st,collapsed:id>5,
+    tasks:ts.map((t,i)=>({...t,id:id+"-"+i,projectId:id,start:addBiz(td,off+t.s),end:addBiz(td,off+t.e),done:false,desc:"",comments:[]})) });
+  return [
+    cp(1,"シゲトウ組 HP制作","シゲトウ組","active",-5,[{name:"ワイヤーフレーム作成",phase:"wire",assignee:"imashige",s:0,e:4},{name:"ワイヤー確認",phase:"review",assignee:"shimizu",s:5,e:5,type:"milestone"},{name:"ライティング",phase:"writing",assignee:"imashige",s:6,e:10},{name:"デザイン制作",phase:"design",assignee:"fujii",s:8,e:17},{name:"撮影",phase:"photo",assignee:"fujii",s:11,e:12},{name:"デザイン確認",phase:"review",assignee:"shimizu",s:18,e:18,type:"milestone"},{name:"コーディング",phase:"coding",assignee:"nishitani",s:19,e:28},{name:"テスト検証",phase:"test",assignee:"nishitani",s:29,e:31},{name:"納品",phase:"delivery",assignee:"shimizu",s:32,e:32,type:"milestone"}]),
+    cp(2,"両備ホームズ 広告運用","両備ホームズ","active",-10,[{name:"岡山エリア広告設計",phase:"ad",assignee:"shimizu",s:0,e:3},{name:"高松エリア広告設計",phase:"ad",assignee:"shimizu",s:2,e:5},{name:"クリエイティブ制作",phase:"design",assignee:"fujii",s:4,e:8},{name:"月次レポート",phase:"review",assignee:"shimizu",s:20,e:20,type:"milestone"}]),
+    cp(3,"山田工務店 LP制作","山田工務店","active",3,[{name:"ヒアリング・企画",phase:"sales",assignee:"shimizu",s:0,e:1},{name:"ワイヤーフレーム",phase:"wire",assignee:"imashige",s:2,e:5},{name:"デザイン",phase:"design",assignee:"fujii",s:6,e:11},{name:"コーディング",phase:"coding",assignee:"nishitani",s:12,e:18},{name:"納品",phase:"delivery",assignee:"shimizu",s:19,e:19,type:"milestone"}]),
+    cp(4,"ABC不動産 採用サイト","ABC不動産","active",-3,[{name:"キックオフ",phase:"kickoff",assignee:"shimizu",s:0,e:0,type:"milestone"},{name:"ワイヤー・構成",phase:"wire",assignee:"imashige",s:1,e:6},{name:"ライティング",phase:"writing",assignee:"imashige",s:5,e:10},{name:"デザイン",phase:"design",assignee:"fujii",s:7,e:16},{name:"撮影(社員)",phase:"photo",assignee:"fujii",s:9,e:10},{name:"クライアント確認",phase:"review",assignee:"shimizu",s:17,e:18,type:"milestone"},{name:"コーディング",phase:"coding",assignee:"nishitani",s:19,e:30},{name:"納品・公開",phase:"delivery",assignee:"shimizu",s:31,e:31,type:"milestone"}]),
+    cp(5,"さくら歯科 リニューアル","さくら歯科","planning",10,[{name:"ヒアリング",phase:"sales",assignee:"shimizu",s:0,e:1},{name:"ワイヤー",phase:"wire",assignee:"imashige",s:3,e:7},{name:"デザイン",phase:"design",assignee:"fujii",s:8,e:15},{name:"コーディング",phase:"coding",assignee:"nishitani",s:16,e:24},{name:"納品",phase:"delivery",assignee:"shimizu",s:25,e:25,type:"milestone"}]),
+    cp(6,"岡山商工会 ECサイト","岡山商工会","active",-8,[{name:"ワイヤー",phase:"wire",assignee:"imashige",s:0,e:5},{name:"デザイン",phase:"design",assignee:"fujii",s:6,e:14},{name:"コーディング",phase:"coding",assignee:"nishitani",s:15,e:28},{name:"納品",phase:"delivery",assignee:"shimizu",s:29,e:29,type:"milestone"}]),
+    cp(7,"グリーンファーム LP","グリーンファーム","active",0,[{name:"ワイヤー",phase:"wire",assignee:"imashige",s:0,e:3},{name:"デザイン",phase:"design",assignee:"fujii",s:4,e:8},{name:"コーディング",phase:"coding",assignee:"nishitani",s:9,e:14},{name:"納品",phase:"delivery",assignee:"shimizu",s:15,e:15,type:"milestone"}]),
+    cp(8,"丸善建設 コーポレート","丸善建設","planning",15,[{name:"ヒアリング",phase:"sales",assignee:"shimizu",s:0,e:1},{name:"ワイヤー",phase:"wire",assignee:"imashige",s:3,e:8},{name:"デザイン",phase:"design",assignee:"fujii",s:9,e:18},{name:"コーディング",phase:"coding",assignee:"nishitani",s:19,e:30},{name:"納品",phase:"delivery",assignee:"shimizu",s:31,e:31,type:"milestone"}]),
+    cp(9,"ひまわり保育園 HP","ひまわり保育園","active",-15,[{name:"ワイヤー",phase:"wire",assignee:"imashige",s:0,e:4},{name:"デザイン",phase:"design",assignee:"fujii",s:5,e:12},{name:"コーディング",phase:"coding",assignee:"nishitani",s:13,e:22},{name:"テスト",phase:"test",assignee:"nishitani",s:23,e:25},{name:"納品",phase:"delivery",assignee:"shimizu",s:26,e:26,type:"milestone"}]),
+    cp(10,"瀬戸内マリーナ 予約サイト","瀬戸内マリーナ","active",-2,[{name:"ワイヤー",phase:"wire",assignee:"imashige",s:0,e:5},{name:"デザイン",phase:"design",assignee:"fujii",s:6,e:14},{name:"コーディング",phase:"coding",assignee:"nishitani",s:15,e:26},{name:"納品",phase:"delivery",assignee:"shimizu",s:27,e:27,type:"milestone"}]),
+    cp(11,"おかやま信金 採用LP","おかやま信金","planning",20,[{name:"ヒアリング",phase:"sales",assignee:"shimizu",s:0,e:1},{name:"ワイヤー",phase:"wire",assignee:"imashige",s:3,e:6},{name:"デザイン",phase:"design",assignee:"fujii",s:7,e:12},{name:"コーディング",phase:"coding",assignee:"nishitani",s:13,e:18},{name:"納品",phase:"delivery",assignee:"shimizu",s:19,e:19,type:"milestone"}]),
+    cp(12,"備前焼ギャラリー EC","備前焼ギャラリー","active",-12,[{name:"ワイヤー",phase:"wire",assignee:"imashige",s:0,e:5},{name:"撮影",phase:"photo",assignee:"fujii",s:3,e:5},{name:"デザイン",phase:"design",assignee:"fujii",s:6,e:14},{name:"コーディング",phase:"coding",assignee:"nishitani",s:15,e:25},{name:"納品",phase:"delivery",assignee:"shimizu",s:26,e:26,type:"milestone"}]),
+  ];
+};
+
+const ST = {
+  tab:on=>({padding:"6px 14px",borderRadius:6,fontSize:12,fontWeight:500,cursor:"pointer",color:on?"#e8eaf0":"#8b90a5",border:"none",background:on?"#2a2f45":"transparent",whiteSpace:"nowrap"}),
+  btnI:{padding:"7px 8px",borderRadius:5,fontSize:12,cursor:"pointer",border:"1px solid #2a2f45",background:"#1c1f2e",color:"#8b90a5"},
+  btnP:{padding:"7px 14px",borderRadius:5,fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",gap:6},
+  fbar:{display:"flex",alignItems:"center",gap:8,padding:"10px 20px",borderBottom:"1px solid #2a2f45",background:"#161822",flexShrink:0,flexWrap:"wrap"},
+  chip:(on,c)=>({padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid "+(on?(c||"#6366f1"):"#2a2f45"),background:on?(c?c+"18":"rgba(99,102,241,.12)"):"transparent",color:on?(c||"#6366f1"):"#8b90a5"}),
+  sbar:on=>({display:"flex",alignItems:"center",gap:12,padding:"8px 20px",background:on?"rgba(129,140,248,.10)":"#161822",borderBottom:"1px solid "+(on?"rgba(129,140,248,.4)":"#2a2f45"),fontSize:12,color:"#818cf8",flexShrink:0,minHeight:38}),
+  sbtn:{padding:"3px 10px",borderRadius:4,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid rgba(129,140,248,.5)",background:"transparent",color:"#818cf8"},
+  side:{width:280,minWidth:280,borderRight:"1px solid #2a2f45",display:"flex",flexDirection:"column",background:"#161822",zIndex:10},
+  prow:isH=>({display:"flex",alignItems:"center",padding:"0 10px",height:isH?44:36,cursor:"pointer",gap:6,fontSize:isH?13:12,userSelect:"none",fontWeight:isH?600:400,background:isH?"#1c1f2e":"transparent",borderBottom:isH?"1px solid #2a2f45":"none",color:isH?"#e8eaf0":"#8b90a5"}),
+  tog:open=>({width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#5c6180",fontSize:10,transform:open?"rotate(90deg)":"none",flexShrink:0}),
+  tav:c=>({width:22,height:22,borderRadius:"50%",fontSize:9,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#fff",background:c}),
+  bar:(l,w,c,sel,drg)=>({position:"absolute",height:22,borderRadius:5,cursor:"grab",display:"flex",alignItems:"center",padding:"0 6px",fontSize:10,fontWeight:500,color:"#fff",zIndex:sel?5:3,overflow:"hidden",whiteSpace:"nowrap",userSelect:"none",left:l,width:Math.max(w,4),top:7,background:"linear-gradient(135deg,"+c+","+c+"cc)",outline:sel?"2px solid #818cf8":"none",outlineOffset:sel?1:0,boxShadow:sel?"0 0 12px rgba(129,140,248,.25)":(drg?"0 4px 20px rgba(0,0,0,.4)":"none"),opacity:drg?0.9:1}),
+  rh:side=>({position:"absolute",top:0,bottom:0,width:8,cursor:"ew-resize",[side==="l"?"left":"right"]:-2}),
+  ms:(l,sel)=>({position:"absolute",zIndex:3,cursor:"grab",display:"flex",alignItems:"center",gap:4,left:l,top:10}),
+  md:(c,sel)=>({width:14,height:14,transform:"rotate(45deg)",borderRadius:2,border:"2px solid "+c,background:c+"30",boxShadow:sel?"0 0 0 3px rgba(129,140,248,.4)":"none"}),
+  cap:{width:220,minWidth:220,borderLeft:"1px solid #2a2f45",background:"#161822",display:"flex",flexDirection:"column",overflowY:"auto"},
+};
+
+// Task Detail Panel
+function TaskPanel({ task, project, setProjects, onClose }) {
+  const [comment, setComment] = useState("");
+  const endRef = useRef(null);
+  const mem = TEAM.find(x => x.id === task.assignee);
+  const ph = PH[task.phase] || { l:"?", c:"#666" };
+  const up = useCallback((f, v) => setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, [f]: v } : t) }))), [task.id, setProjects]);
+  const addC = () => { if (!comment.trim()) return; const c = { id: Date.now(), text: comment.trim(), author: "shimizu", time: timeNow() }; setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, comments: [...(t.comments||[]), c] } : t) }))); setComment(""); setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50); };
+  const inp = { width:"100%", padding:"8px 10px", borderRadius:6, border:"1px solid #2a2f45", background:"#1c1f2e", color:"#e8eaf0", fontSize:13, fontFamily:"inherit", outline:"none" };
+  const sel = { ...inp, cursor:"pointer" };
+  const lab = { fontSize:11, fontWeight:600, color:"#5c6180", marginBottom:4, display:"block" };
+  return (
+    <div style={{ position:"fixed", top:0, right:0, bottom:0, width:440, background:"#161822", borderLeft:"1px solid #2a2f45", zIndex:1000, display:"flex", flexDirection:"column", boxShadow:"-8px 0 32px rgba(0,0,0,.4)" }}>
+      <div style={{ padding:"16px 20px", borderBottom:"1px solid #2a2f45", display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+        <button onClick={() => up("done", !task.done)} style={{ width:28, height:28, borderRadius:"50%", border:task.done?"none":"2px solid #5c6180", background:task.done?"#10b981":"transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:14, flexShrink:0 }}>{task.done && "✓"}</button>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:10, color:"#5c6180" }}>{project}</div>
+          <div style={{ fontSize:15, fontWeight:600, textDecoration:task.done?"line-through":"none", opacity:task.done?0.5:1 }}>{task.name}</div>
+        </div>
+        <button onClick={onClose} style={{ width:28, height:28, border:"none", background:"#1c1f2e", borderRadius:6, cursor:"pointer", color:"#8b90a5", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{"✕"}</button>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", padding:"0 20px 20px" }}>
+        <div style={{ padding:"16px 0 12px", display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:600, background:task.done?"#10b98120":ph.c+"20", color:task.done?"#10b981":ph.c }}>{task.done?"✓ 完了":ph.l}</span>
+          {task.type==="milestone"&&<span style={{ padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#f59e0b20", color:"#f59e0b" }}>{"◆ マイルストーン"}</span>}
+        </div>
+        <div style={{ display:"grid", gap:16 }}>
+          <div><label style={lab}>タスク名</label><input value={task.name} onChange={e=>up("name",e.target.value)} style={inp}/></div>
+          <div><label style={lab}>担当者</label>
+            <div style={{ position:"relative" }}>
+              <select value={task.assignee} onChange={e=>up("assignee",e.target.value)} style={sel}>{TEAM.map(m=><option key={m.id} value={m.id}>{m.name} - {m.role}</option>)}</select>
+              {mem&&<div style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:20, height:20, borderRadius:"50%", background:mem.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:700, color:"#fff", pointerEvents:"none" }}>{mem.av}</div>}
+            </div>
+          </div>
+          <div><label style={lab}>フェーズ</label><select value={task.phase} onChange={e=>up("phase",e.target.value)} style={sel}>{PH_KEYS.map(k=><option key={k} value={k}>{PH[k].l}</option>)}</select></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <div><label style={lab}>開始日</label><input type="date" value={fmtISO(task.start)} onChange={e=>{if(e.target.value)up("start",new Date(e.target.value))}} style={inp}/></div>
+            <div><label style={lab}>終了日</label><input type="date" value={fmtISO(task.end)} onChange={e=>{if(e.target.value)up("end",new Date(e.target.value))}} style={inp}/></div>
+          </div>
+          <div style={{ fontSize:11, color:"#5c6180" }}>{diffD(task.start,task.end)+1}日間 ({fmtDF(task.start)} → {fmtDF(task.end)})</div>
+          <div><label style={lab}>説明・メモ</label><textarea value={task.desc||""} onChange={e=>up("desc",e.target.value)} placeholder="タスクの詳細、注意事項など..." rows={4} style={{...inp,resize:"vertical",lineHeight:1.6}}/></div>
+        </div>
+        <div style={{ marginTop:24 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:"#5c6180", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>コメント{task.comments&&task.comments.length>0&&<span style={{ background:"#6366f1", color:"#fff", borderRadius:10, padding:"1px 7px", fontSize:10 }}>{task.comments.length}</span>}</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:12 }}>
+            {(!task.comments||task.comments.length===0)&&<div style={{ padding:16, textAlign:"center", color:"#5c6180", fontSize:12, background:"#1c1f2e", borderRadius:8 }}>まだコメントはありません</div>}
+            {(task.comments||[]).map(c => { const a = TEAM.find(x=>x.id===c.author)||TEAM[0]; return (
+              <div key={c.id} style={{ display:"flex", gap:10, padding:10, background:"#1c1f2e", borderRadius:8 }}>
+                <div style={{ width:28, height:28, borderRadius:"50%", background:a.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"#fff", flexShrink:0 }}>{a.av}</div>
+                <div style={{ flex:1 }}><div style={{ display:"flex", alignItems:"baseline", gap:8 }}><span style={{ fontSize:12, fontWeight:600 }}>{a.name}</span><span style={{ fontSize:10, color:"#5c6180" }}>{c.time}</span></div><div style={{ fontSize:13, color:"#e8eaf0", lineHeight:1.5, marginTop:2, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>{c.text}</div></div>
+              </div>); })}
+            <div ref={endRef}/>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <div style={{ width:28, height:28, borderRadius:"50%", background:TEAM[0].color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"#fff", flexShrink:0, marginTop:2 }}>{TEAM[0].av}</div>
+            <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+              <textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="コメントを入力..." rows={2} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addC()}}} style={{...inp,resize:"none",lineHeight:1.5}}/>
+              <div style={{ display:"flex", justifyContent:"flex-end" }}><button onClick={addC} disabled={!comment.trim()} style={{ padding:"6px 16px", borderRadius:6, fontSize:12, fontWeight:500, cursor:comment.trim()?"pointer":"default", border:"none", background:comment.trim()?"#6366f1":"#2a2f45", color:comment.trim()?"#fff":"#5c6180" }}>送信</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Calendar
+function CalView({ projects, today, onOpen }) {
+  const [mode, setMode] = useState("month");
+  const [dt, setDt] = useState(()=>new Date());
+  const evts = useMemo(() => { const ev={}; projects.forEach(p=>p.tasks.forEach(t=>{const d=new Date(t.start);while(d<=new Date(t.end)){const k=d.toDateString();if(!ev[k])ev[k]=[];ev[k].push({...t,projectName:p.name});d.setDate(d.getDate()+1)}})); return ev; }, [projects]);
+  const nav = dir => { const d=new Date(dt); if(mode==="month") d.setMonth(d.getMonth()+dir); else if(mode==="week") d.setDate(d.getDate()+dir*7); else d.setDate(d.getDate()+dir); setDt(d); };
+  const title = mode==="month"?dt.getFullYear()+"年 "+MN[dt.getMonth()]:mode==="week"?(()=>{const m=getMon(dt);return fmtDF(m)+" 〜 "+fmtDF(addDays(m,6))})():fmtDF(dt)+" ("+DN[dt.getDay()]+")";
+  const mGrid = useMemo(() => { if(mode!=="month")return[]; const y=dt.getFullYear(),m=dt.getMonth(),sd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),cells=[],pmd=new Date(y,m,0).getDate(); for(let i=sd-1;i>=0;i--)cells.push({date:new Date(y,m-1,pmd-i),om:true}); for(let i=1;i<=dim;i++)cells.push({date:new Date(y,m,i),om:false}); while(cells.length<42)cells.push({date:new Date(y,m+1,cells.length-sd-dim+1),om:true}); return cells; },[dt,mode]);
+  const wDays = useMemo(()=>{if(mode!=="week")return[];const m=getMon(dt);return Array.from({length:7},(_,i)=>addDays(m,i))},[dt,mode]);
+  const hours = useMemo(()=>Array.from({length:12},(_,i)=>i+8),[]);
+  const ztab=on=>({padding:"4px 10px",borderRadius:5,fontSize:11,fontWeight:500,cursor:"pointer",color:on?"#e8eaf0":"#5c6180",border:"none",background:on?"#2a2f45":"transparent"});
+  const re = (ev,j) => (<div key={j} onClick={()=>onOpen(ev)} style={{padding:"2px 5px",borderRadius:3,fontSize:10,fontWeight:500,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",background:(PH[ev.phase]?.c||"#666")+"25",color:PH[ev.phase]?.c||"#666",textDecoration:ev.done?"line-through":"none",opacity:ev.done?0.5:1}}>{ev.name}</div>);
+  return (
+    <div style={{flex:1,overflow:"auto",padding:20}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+        <button style={ST.btnI} onClick={()=>nav(-1)}>{"◀"}</button>
+        <div style={{fontSize:18,fontWeight:600,minWidth:200}}>{title}</div>
+        <button style={ST.btnI} onClick={()=>nav(1)}>{"▶"}</button>
+        <button style={{...ST.btnI,padding:"7px 14px",marginLeft:8}} onClick={()=>setDt(new Date())}>今日</button>
+        <div style={{marginLeft:"auto",display:"flex",gap:2,background:"#1c1f2e",borderRadius:6,padding:2}}>
+          {[{k:"day",l:"日"},{k:"week",l:"週"},{k:"month",l:"月"}].map(z=><button key={z.k} style={ztab(mode===z.k)} onClick={()=>setMode(z.k)}>{z.l}</button>)}
+        </div>
+      </div>
+      {mode==="month"&&<div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:1,background:"#2a2f45",borderRadius:12,overflow:"hidden"}}>{DN.map(d=><div key={d} style={{padding:10,textAlign:"center",fontSize:11,fontWeight:600,color:"#5c6180",background:"#161822"}}>{d}</div>)}{mGrid.map((c,i)=>{const ev=evts[c.date.toDateString()]||[];const isT=same(c.date,today);return(<div key={i} style={{minHeight:100,padding:8,background:isT?"rgba(99,102,241,.12)":(isWE(c.date)?"rgba(255,255,255,.02)":"#0f1117"),opacity:c.om?0.3:1}}><div style={isT?{color:"#fff",fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,background:"#6366f1",borderRadius:"50%",fontSize:12,marginBottom:4}:{fontSize:12,fontWeight:500,marginBottom:4,color:"#8b90a5"}}>{c.date.getDate()}</div>{ev.slice(0,3).map(re)}{ev.length>3&&<div style={{fontSize:10,color:"#5c6180"}}>+{ev.length-3}</div>}</div>)})}</div>}
+      {mode==="week"&&<div style={{display:"grid",gridTemplateColumns:"60px repeat(7,1fr)",gap:1,background:"#2a2f45",borderRadius:12,overflow:"hidden"}}><div style={{background:"#161822",padding:10}}/>{wDays.map((d,i)=>(<div key={i} style={{padding:10,textAlign:"center",fontSize:12,fontWeight:same(d,today)?700:500,color:same(d,today)?"#6366f1":"#8b90a5",background:"#161822"}}><div style={{fontSize:10}}>{DN[d.getDay()]}</div><div style={same(d,today)?{display:"inline-flex",width:24,height:24,borderRadius:"50%",background:"#6366f1",color:"#fff",alignItems:"center",justifyContent:"center",fontWeight:700}:{}}>{d.getDate()}</div></div>))}{hours.map(h=>(<React.Fragment key={h}><div style={{background:"#161822",padding:"8px 4px",fontSize:10,color:"#5c6180",textAlign:"right"}}>{h}:00</div>{wDays.map((d,di)=>{const ev=evts[d.toDateString()]||[];return(<div key={di} style={{minHeight:60,padding:4,background:isWE(d)?"rgba(255,255,255,.02)":"#0f1117",borderTop:"1px solid #1c1f2e"}}>{h===9&&ev.slice(0,4).map(re)}</div>)})}</React.Fragment>))}</div>}
+      {mode==="day"&&<div style={{background:"#2a2f45",borderRadius:12,overflow:"hidden"}}>{hours.map(h=>{const ev=h===9?(evts[dt.toDateString()]||[]):[];return(<div key={h} style={{display:"flex",borderBottom:"1px solid #1c1f2e"}}><div style={{width:60,padding:"12px 8px",fontSize:11,color:"#5c6180",textAlign:"right",background:"#161822",flexShrink:0}}>{h}:00</div><div style={{flex:1,minHeight:60,padding:8,background:"#0f1117"}}>{ev.map(re)}</div></div>)})}</div>}
+    </div>
+  );
+}
+
+// Main
+export default function App() {
+  const [projects, setProjects] = useState(genProjects);
+  const [view, setView] = useState("gantt");
+  const [dayWidth, setDayWidth] = useState(DEFAULT_DW);
+  const [filterA, setFilterA] = useState(null);
+  const [filterS, setFilterS] = useState(null);
+  const [showCap, setShowCap] = useState(true);
+  const [openTid, setOpenTid] = useState(null);
+  const [tip, setTip] = useState(null);
+  const [drag, setDrag] = useState(null);
+  const [dragShift, setDragShift] = useState(0);
+  const [dragPos, setDragPos] = useState(null);
+  const [selIds, setSelIds] = useState(()=>new Set());
+  const [marquee, setMarquee] = useState(null);
+  const [mActive, setMActive] = useState(false);
+  const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
+  const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
+  const DW = dayWidth;
+  const zoomLevel = getZL(DW);
+
+  const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name};return null},[openTid,projects]);
+
+  const toggleSel = useCallback((id,e)=>{if(e&&(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n});else setSelIds(p=>(p.has(id)&&p.size===1)?new Set():new Set([id]))},[]);
+  const selProject = useCallback(pid=>{const p=projects.find(x=>x.id===pid);if(!p)return;const ids=p.tasks.map(t=>t.id);setSelIds(prev=>{const allIn=ids.every(id=>prev.has(id));const n=new Set();if(!allIn)ids.forEach(id=>n.add(id));return n})},[projects]);
+  const clearSel = useCallback(()=>setSelIds(new Set()),[]);
+
+  const dateRange = useMemo(()=>{let mn=new Date(today);mn.setDate(mn.getDate()-60);let mx=new Date(today);mx.setDate(mx.getDate()+120);projects.forEach(p=>p.tasks.forEach(t=>{if(new Date(t.start)<mn)mn=new Date(t.start);if(new Date(t.end)>mx)mx=new Date(t.end)}));mn.setDate(mn.getDate()-14);mx.setDate(mx.getDate()+14);const d=[],c=new Date(mn);while(c<=mx){d.push(new Date(c));c.setDate(c.getDate()+1)}return d},[projects,today]);
+  const totalWidth = dateRange.length*DW;
+  const getPos = useCallback(date=>{const dt=new Date(date);dt.setHours(0,0,0,0);return diffD(dateRange[0],dt)*DW},[dateRange,DW]);
+  const todayPos = useMemo(()=>getPos(today),[getPos,today]);
+
+  const filtered = useMemo(()=>projects.map(p=>({...p,tasks:p.tasks.filter(t=>!filterA||t.assignee===filterA)})).filter(p=>{if(filterS&&p.status!==filterS)return false;if(filterA&&p.tasks.length===0)return false;return true}),[projects,filterA,filterS]);
+  const togProj = useCallback(id=>setProjects(p=>p.map(x=>x.id===id?{...x,collapsed:!x.collapsed}:x)),[]);
+  const selectAll = useCallback(()=>{const a=new Set();filtered.forEach(p=>p.tasks.forEach(t=>a.add(t.id)));setSelIds(a)},[filtered]);
+
+  const headerRows = useMemo(()=>{
+    const top=[],bot=[];
+    if(zoomLevel==="day"){let cm=null;dateRange.forEach(d=>{const k=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==k){cm={key:k,label:d.getFullYear()+"年 "+MN[d.getMonth()],count:0};top.push(cm)}cm.count++;bot.push({label:d.getDate().toString(),sub:DN[d.getDay()],isWE:isWE(d),isToday:same(d,today),width:DW})});top.forEach(g=>{g.width=g.count*DW})}
+    else if(zoomLevel==="week"){let cm=null,cw=null;dateRange.forEach(d=>{const mk=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==mk){cm={key:mk,label:MN[d.getMonth()],count:0};top.push(cm)}cm.count++;const wk=getMon(d),wkk=wk.toDateString();if(!cw||cw.key!==wkk){cw={key:wkk,label:fmtD(wk)+"〜",isToday:false,days:0};bot.push(cw)}cw.days++;if(same(d,today))cw.isToday=true});top.forEach(g=>{g.width=g.count*DW});bot.forEach(w=>{w.width=w.days*DW})}
+    else{let cy=null,cm=null;dateRange.forEach(d=>{const yk=d.getFullYear().toString();if(!cy||cy.key!==yk){cy={key:yk,label:yk+"年",count:0};top.push(cy)}cy.count++;const mk=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==mk){cm={key:mk,label:MN[d.getMonth()],isToday:false,days:0};bot.push(cm)}cm.days++;if(same(d,today))cm.isToday=true});top.forEach(g=>{g.width=g.count*DW});bot.forEach(m=>{m.width=m.days*DW})}
+    return{top,bot};
+  },[dateRange,DW,zoomLevel,today]);
+
+  const rowList = useMemo(()=>{
+    if(view==="timeline"){const rows=[];TEAM.forEach(m=>{const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push({...t,projName:p.name})}));if(mt.length>0){rows.push({type:"member",member:m,count:mt.length});mt.forEach(t=>rows.push({type:"task",task:t,project:{name:t.projName}}))}});return rows}
+    const r=[];filtered.forEach(p=>{r.push({type:"project",project:p});if(!p.collapsed)p.tasks.forEach(t=>r.push({type:"task",task:t,project:p}))});return r;
+  },[filtered,view]);
+
+  // Drag
+  const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end)}}));setDrag({task,type:type||"move",startX:e.clientX,active,od});setDragShift(0)},[selIds,projects]);
+  useEffect(()=>{if(!drag)return;const onM=e=>{const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(!o)return t;if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}return t})})))};const onU=()=>{setDrag(null);setDragShift(0);setDragPos(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW]);
+
+  // Zoom
+  const handleWheel = useCallback(e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const g=ganttRef.current;if(!g)return;const rect=g.getBoundingClientRect(),mx=e.clientX-rect.left,sl=g.scrollLeft,md=(sl+mx)/DW;const f=e.deltaY<0?1.15:0.87;const nDW=clamp(DW*f,MIN_DW,MAX_DW);setDayWidth(nDW);requestAnimationFrame(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=md*nDW-mx})},[DW]);
+
+  // Marquee
+  const handleMStart = useCallback(e=>{if(e.target.closest("[data-bar]"))return;if(e.button!==0)return;const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();setMarquee({sx:e.clientX-rect.left,sy:e.clientY-rect.top,cx:e.clientX-rect.left,cy:e.clientY-rect.top});setMActive(true);if(!(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(new Set())},[]);
+  useEffect(()=>{if(!mActive||!marquee)return;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}setSelIds(hit)};const onU=()=>{setMActive(false);setMarquee(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee]);
+
+  useEffect(()=>{setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)},[todayPos,view]);
+  useEffect(()=>{const h=e=>{if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid]);
+
+  const capData = useMemo(()=>{const ws=getMon(today),we=addDays(ws,4);return TEAM.map(m=>{const mt=[];projects.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id){const s=new Date(t.start),e=new Date(t.end);if(s<=we&&e>=ws){const os=s>ws?s:ws,oe=e<we?e:we;const d=diffD(os,oe)+1;mt.push({name:t.name,hours:d*8,color:PH[t.phase]?.c||"#666"})}}}));const th=mt.reduce((s,t)=>s+t.hours,0);return{...m,tasks:mt,totalHours:th,util:Math.min(100,Math.round(th/m.hpw*100))}})},[projects,today]);
+
+  useMemo(()=>{const pos={};let rowY=0;rowList.forEach(row=>{if(row.type==="project"||row.type==="member"){rowY+=44;return}const t=row.task;const left=getPos(t.start),right=getPos(t.end)+DW;if(t.type==="milestone")pos[t.id]={left,right:left+24,top:rowY+6,bottom:rowY+30};else pos[t.id]={left,right,top:rowY+7,bottom:rowY+29};rowY+=36});barRects.current=pos},[rowList,getPos,DW]);
+
+  const mRect=marquee?{left:Math.min(marquee.sx,marquee.cx),top:Math.min(marquee.sy,marquee.cy),width:Math.abs(marquee.cx-marquee.sx),height:Math.abs(marquee.cy-marquee.sy)}:null;
+  const selCount=selIds.size;
+  const isGL=view==="gantt"||view==="timeline";
+  const presets=[{l:"日",dw:40},{l:"週",dw:16},{l:"月",dw:5},{l:"四半期",dw:2},{l:"年",dw:1.5}];
+
+  return (
+    <div style={{width:"100vw",height:"100vh",display:"flex",flexDirection:"column",background:"#0f1117",overflow:"hidden",fontFamily:"'Noto Sans JP',sans-serif",color:"#e8eaf0"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px",height:56,borderBottom:"1px solid #2a2f45",background:"#161822",flexShrink:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:30,height:30,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14,color:"#fff"}}>G</div><span style={{fontSize:15,fontWeight:600}}>Gridge Projects</span></div>
+          <div style={{display:"flex",gap:2,background:"#1c1f2e",borderRadius:8,padding:3}}>
+            <button style={ST.tab(view==="gantt")} onClick={()=>setView("gantt")}>{"▤ ガント"}</button>
+            <button style={ST.tab(view==="timeline")} onClick={()=>setView("timeline")}>{"👤 メンバー"}</button>
+            <button style={ST.tab(view==="calendar")} onClick={()=>setView("calendar")}>{"▦ カレンダー"}</button>
+          </div>
+          {isGL&&<div style={{display:"flex",alignItems:"center",gap:8,marginLeft:8}}>
+            <div style={{display:"flex",gap:2,background:"#1c1f2e",borderRadius:6,padding:2}}>{presets.map(p=><button key={p.l} style={{padding:"4px 8px",borderRadius:4,fontSize:10,fontWeight:500,cursor:"pointer",color:Math.abs(dayWidth-p.dw)<1?"#e8eaf0":"#5c6180",border:"none",background:Math.abs(dayWidth-p.dw)<1?"#2a2f45":"transparent"}} onClick={()=>setDayWidth(p.dw)}>{p.l}</button>)}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:11,color:"#5c6180",cursor:"pointer"}} onClick={()=>setDayWidth(clamp(DW*.7,MIN_DW,MAX_DW))}>{"−"}</span>
+              <input type="range" min={Math.log(MIN_DW)} max={Math.log(MAX_DW)} step={0.01} value={Math.log(DW)} onChange={e=>setDayWidth(Math.exp(parseFloat(e.target.value)))} style={{width:80,accentColor:"#6366f1",cursor:"pointer"}}/>
+              <span style={{fontSize:11,color:"#5c6180",cursor:"pointer"}} onClick={()=>setDayWidth(clamp(DW*1.4,MIN_DW,MAX_DW))}>{"＋"}</span>
+              <span style={{fontSize:10,color:"#5c6180",minWidth:24}}>{getZLbl(DW)}</span>
+            </div>
+          </div>}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button style={{...ST.btnI,...(showCap?{background:"rgba(99,102,241,.12)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowCap(!showCap)}>{"👥"}</button>
+          <button style={ST.btnP}>{"＋ 新規案件"}</button>
+        </div>
+      </div>
+
+      <div style={ST.fbar}>
+        <span style={{fontSize:11,color:"#5c6180",marginRight:4}}>担当:</span>
+        <button style={ST.chip(!filterA)} onClick={()=>setFilterA(null)}>全員</button>
+        {TEAM.map(m=><button key={m.id} style={ST.chip(filterA===m.id,m.color)} onClick={()=>setFilterA(filterA===m.id?null:m.id)}>{m.name}</button>)}
+        <div style={{width:1,height:20,background:"#2a2f45"}}/>
+        <span style={{fontSize:11,color:"#5c6180",marginRight:4}}>状態:</span>
+        <button style={ST.chip(!filterS)} onClick={()=>setFilterS(null)}>すべて</button>
+        <button style={ST.chip(filterS==="active")} onClick={()=>setFilterS(filterS==="active"?null:"active")}>進行中</button>
+        <button style={ST.chip(filterS==="planning")} onClick={()=>setFilterS(filterS==="planning"?null:"planning")}>計画中</button>
+      </div>
+
+      {isGL&&<div style={ST.sbar(selCount>0)}>
+        {selCount>0?<React.Fragment><span style={{fontWeight:700,fontSize:14}}>{selCount}</span><span>件選択中</span><button style={ST.sbtn} onClick={clearSel}>選択解除 (Esc)</button><button style={ST.sbtn} onClick={selectAll}>すべて選択</button><span style={{fontSize:11,color:"#5c6180",marginLeft:"auto"}}>ドラッグで一括移動 ・ 空白をドラッグで範囲選択</span></React.Fragment>
+        :<React.Fragment><span style={{color:"#5c6180"}}>タスクを選択してください</span><span style={{fontSize:11,color:"#5c6180",marginLeft:"auto"}}>Ctrl+スクロールで拡大縮小 ・ ダブルクリックでタスク詳細</span></React.Fragment>}
+      </div>}
+
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:(
+          <React.Fragment>
+            <div style={ST.side}>
+              <div style={{padding:"12px 16px",fontSize:11,fontWeight:600,color:"#5c6180",borderBottom:"1px solid #2a2f45"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
+              <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
+                {rowList.map(row=>{
+                  if(row.type==="project"){const p=row.project;return(<div key={"p-"+p.id} style={ST.prow(true)}><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#5c6180"}}>{p.tasks.length}</span></div>)}
+                  if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:10,color:"#5c6180"}}>{row.count}</span></div>)}
+                  const t=row.task;const m=TEAM.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);
+                  return(<div key={"t-"+t.id} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(129,140,248,.12)"}:{})}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)}>
+                    {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
+                    <div style={{width:6,height:6,borderRadius:2,flexShrink:0,background:PH[t.phase]?.c}}/>
+                    <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",opacity:t.done?0.5:1}}>{t.name}</div>
+                    {m&&<div style={ST.tav(m.color)}>{m.av}</div>}
+                  </div>);
+                })}
+              </div>
+            </div>
+
+            <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden"}}>
+              <div ref={headerRef} style={{flexShrink:0,overflow:"hidden"}}>
+                <div style={{display:"flex"}}>{headerRows.top.map((g,i)=><div key={i} style={{fontSize:11,fontWeight:600,color:"#8b90a5",padding:"6px 0 2px 8px",borderBottom:"1px solid #2a2f45",background:"#161822",width:g.width,minWidth:g.width,overflow:"hidden",whiteSpace:"nowrap"}}>{g.width>40?g.label:""}</div>)}</div>
+                <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#5c6180",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"6px 2px",borderRight:"1px solid #2a2f45",flexShrink:0,width:col.width,minWidth:col.width,background:col.isWE?"rgba(255,255,255,.02)":"#161822",opacity:col.isWE&&!col.isToday?0.5:1,overflow:"hidden"}}>{zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>:<span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{col.width>20?col.label:""}</span>}</div>))}</div>
+              </div>
+              <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop}}>
+                <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart}>
+                  <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:.7,pointerEvents:"none",left:todayPos+DW/2}}/>
+                  {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,borderRight:"1px solid rgba(42,47,69,.5)",background:isWE(d)?"rgba(255,255,255,.02)":"transparent"}}/>)}</div>}
+                  {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #818cf8",background:"rgba(99,102,241,.08)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
+                  {rowList.map(row=>{
+                    if(row.type==="project"||row.type==="member")return<div key={"gr-"+(row.project?.id||row.member?.id)} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #2a2f45",background:"rgba(255,255,255,.01)"}}/>;
+                    const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=right-left;
+                    const ph=PH[t.phase]||{c:"#666"};const isMs=t.type==="milestone";const mem=TEAM.find(x=>x.id===t.assignee);
+                    const isSel=selIds.has(t.id);const isDrg=drag&&drag.active&&drag.active.has(t.id);
+                    const ds=t.done?{opacity:0.4,filter:"grayscale(50%)"}:{};
+                    return(<div key={"gr-"+t.id} style={{display:"flex",position:"relative",height:36}}>
+                      {isMs?(<div data-bar="1" style={{...ST.ms(left,isSel),...ds}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:row.project.name})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}><div style={ST.md(ph.c,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#8b90a5",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name}</span>}</div>)
+                      :(<div data-bar="1" style={{...ST.bar(left,width,ph.c,isSel,isDrg),...ds}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:row.project.name})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}>
+                        <div style={ST.rh("l")} onMouseDown={e=>startDrag(e,t,"resize-left")}/>
+                        {width>50&&<span style={{overflow:"hidden",textOverflow:"ellipsis",pointerEvents:"none"}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&<span style={{opacity:.7,marginRight:4}}>{mem.av}</span>}{t.name}</span>}
+                        <div style={ST.rh("r")} onMouseDown={e=>startDrag(e,t,"resize-right")}/>
+                      </div>)}
+                    </div>);
+                  })}
+                </div>
+              </div>
+            </div>
+          </React.Fragment>
+        )}
+
+        {showCap&&!openTask&&(
+          <div style={ST.cap}>
+            <div style={{padding:"12px 16px",fontSize:11,fontWeight:600,color:"#5c6180",borderBottom:"1px solid #2a2f45"}}>今週のキャパシティ<div style={{fontSize:10,fontWeight:400,marginTop:2}}>{fmtD(getMon(today))} 〜 {fmtD(addDays(getMon(today),4))}</div></div>
+            {capData.map(m=>(
+              <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #2a2f45"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500}}>{m.name}</div><div style={{fontSize:10,color:"#5c6180"}}>{m.role}</div></div></div>
+                <div style={{height:6,background:"#1c1f2e",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#5c6180"}}><span>{m.totalHours}h / {m.hpw}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
+                <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#8b90a5"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#5c6180",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#5c6180",padding:"4px 0"}}>タスクなし</div>}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {openTask&&<TaskPanel task={openTask.task} project={openTask.project} setProjects={setProjects} onClose={()=>setOpenTid(null)}/>}
+      {openTask&&<div onClick={()=>setOpenTid(null)} style={{position:"fixed",top:0,left:0,right:440,bottom:0,zIndex:999,background:"rgba(0,0,0,.2)"}}/>}
+
+      {dragPos&&dragShift!==0&&<div style={{position:"fixed",background:"#1c1f2e",border:"1px solid #6366f1",borderRadius:6,padding:"6px 12px",zIndex:200,pointerEvents:"none",fontSize:12,fontWeight:600,color:"#6366f1",boxShadow:"0 4px 24px rgba(0,0,0,.4)",whiteSpace:"nowrap",left:dragPos.x,top:dragPos.y}}>{dragShift>0?"+"+dragShift+"日 →":dragShift+"日 ←"}{selCount>1?" ("+selCount+"件)":""}</div>}
+
+      {tip&&!drag&&<div style={{position:"fixed",background:"#1c1f2e",border:"1px solid #353b52",borderRadius:8,padding:"10px 14px",zIndex:100,pointerEvents:"none",boxShadow:"0 4px 24px rgba(0,0,0,.4)",minWidth:180,left:tip.x+12,top:tip.y-10}}>
+        <div style={{fontSize:12,fontWeight:600,marginBottom:4}}>{tip.task.name}</div>
+        <div style={{fontSize:11,color:"#8b90a5",marginBottom:2}}>{"📁 "}{tip.project}</div>
+        <div style={{fontSize:11,color:"#8b90a5",marginBottom:2}}>{"📅 "}{fmtDF(tip.task.start)}{" → "}{fmtDF(tip.task.end)}</div>
+        <div style={{fontSize:11,color:"#8b90a5",marginBottom:2}}>{"👤 "}{TEAM.find(x=>x.id===tip.task.assignee)?.name}</div>
+        <div style={{fontSize:11,color:"#8b90a5",display:"flex",alignItems:"center",gap:4,marginTop:2}}><div style={{width:6,height:6,borderRadius:2,background:PH[tip.task.phase]?.c}}/>{PH[tip.task.phase]?.l}</div>
+      </div>}
+    </div>
+  );
+}
