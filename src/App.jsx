@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { supabase } from "./supabase";
 
 const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
 const addBiz = (d, n) => { let r = new Date(d), a = 0, dir = n >= 0 ? 1 : -1; while (a < Math.abs(n)) { r.setDate(r.getDate() + dir); if (r.getDay() !== 0 && r.getDay() !== 6) a++; } return r; };
@@ -25,6 +26,36 @@ const PH = {
   sales:{l:"営業・ヒアリング",c:"#6366f1"},kickoff:{l:"キックオフ",c:"#8b5cf6"},wire:{l:"ワイヤーフレーム",c:"#f59e0b"},writing:{l:"ライティング",c:"#f97316"},design:{l:"デザイン",c:"#10b981"},photo:{l:"撮影",c:"#14b8a6"},coding:{l:"コーディング",c:"#ef4444"},test:{l:"テスト・検証",c:"#ec4899"},delivery:{l:"納品",c:"#06b6d4"},review:{l:"お客様確認",c:"#64748b"},ad:{l:"広告運用",c:"#7c3aed"},
 };
 const PH_KEYS = Object.keys(PH);
+const TASK_STATUS = [
+  {id:"inbox",label:"インボックス",color:"#6b7280"},
+  {id:"todo",label:"未着手",color:"#f59e0b"},
+  {id:"in_progress",label:"進行中",color:"#3b82f6"},
+  {id:"review",label:"確認中",color:"#8b5cf6"},
+  {id:"done",label:"完了",color:"#10b981"},
+];
+const TEMPLATES = [
+  {id:"web",name:"Web制作（HP）",icon:"🌐",tasks:[
+    {name:"ヒアリング",phase:"sales",s:0,e:1},
+    {name:"ワイヤーフレーム",phase:"wire",s:2,e:6},
+    {name:"ライティング",phase:"writing",s:5,e:9},
+    {name:"デザイン",phase:"design",s:7,e:16},
+    {name:"撮影",phase:"photo",s:10,e:11},
+    {name:"コーディング",phase:"coding",s:17,e:28},
+    {name:"テスト・検証",phase:"test",s:29,e:31},
+    {name:"納品",phase:"delivery",s:32,e:32,type:"milestone"},
+  ]},
+  {id:"lp",name:"LP制作",icon:"📄",tasks:[
+    {name:"ワイヤーフレーム",phase:"wire",s:0,e:3},
+    {name:"デザイン",phase:"design",s:4,e:9},
+    {name:"コーディング",phase:"coding",s:10,e:16},
+    {name:"納品",phase:"delivery",s:17,e:17,type:"milestone"},
+  ]},
+  {id:"ad",name:"広告運用",icon:"📊",tasks:[
+    {name:"広告設計",phase:"ad",s:0,e:3},
+    {name:"クリエイティブ制作",phase:"design",s:4,e:8},
+    {name:"運用開始",phase:"ad",s:9,e:9,type:"milestone"},
+  ]},
+];
 const MIN_DW = 1.5, MAX_DW = 60, DEFAULT_DW = 40;
 const getZL = dw => dw >= 25 ? "day" : dw >= 8 ? "week" : "month";
 const getZLbl = dw => ({day:"日",week:"週",month:"月"})[getZL(dw)] || "月";
@@ -32,7 +63,7 @@ const getZLbl = dw => ({day:"日",week:"週",month:"月"})[getZL(dw)] || "月";
 const genProjects = () => {
   const td = new Date(); td.setHours(0,0,0,0);
   const cp = (id,nm,cl,st,off,ts) => ({ id,name:nm,client:cl,status:st,collapsed:id>5,
-    tasks:ts.map((t,i)=>({...t,id:id+"-"+i,projectId:id,start:addBiz(td,off+t.s),end:addBiz(td,off+t.e),done:false,desc:"",comments:[],estimatedHours:null})) });
+    tasks:ts.map((t,i)=>({...t,id:id+"-"+i,projectId:id,start:addBiz(td,off+t.s),end:addBiz(td,off+t.e),done:false,taskStatus:"todo",desc:"",comments:[],estimatedHours:null})) });
   return [
     cp(1,"シゲトウ組 HP制作","シゲトウ組","active",-5,[{name:"ワイヤーフレーム作成",phase:"wire",assignee:"imashige",s:0,e:4},{name:"ワイヤー確認",phase:"review",assignee:"shimizu",s:5,e:5,type:"milestone"},{name:"ライティング",phase:"writing",assignee:"imashige",s:6,e:10},{name:"デザイン制作",phase:"design",assignee:"fujii",s:8,e:17},{name:"撮影",phase:"photo",assignee:"fujii",s:11,e:12},{name:"デザイン確認",phase:"review",assignee:"shimizu",s:18,e:18,type:"milestone"},{name:"コーディング",phase:"coding",assignee:"nishitani",s:19,e:28},{name:"テスト検証",phase:"test",assignee:"nishitani",s:29,e:31},{name:"納品",phase:"delivery",assignee:"shimizu",s:32,e:32,type:"milestone"}]),
     cp(2,"両備ホームズ 広告運用","両備ホームズ","active",-10,[{name:"岡山エリア広告設計",phase:"ad",assignee:"shimizu",s:0,e:3},{name:"高松エリア広告設計",phase:"ad",assignee:"shimizu",s:2,e:5},{name:"クリエイティブ制作",phase:"design",assignee:"fujii",s:4,e:8},{name:"月次レポート",phase:"review",assignee:"shimizu",s:20,e:20,type:"milestone"}]),
@@ -85,7 +116,7 @@ function TaskPanel({ task, project, setProjects, onClose }) {
         <button onClick={() => up("done", !task.done)} style={{ width:28, height:28, borderRadius:"50%", border:task.done?"none":"2px solid #d1d5db", background:task.done?"#10b981":"transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:14, flexShrink:0 }}>{task.done && "✓"}</button>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:10, color:"#6b7280" }}>{project}</div>
-          <div style={{ fontSize:15, fontWeight:600, color:"#1f2937", textDecoration:task.done?"line-through":"none", opacity:task.done?0.5:1 }}>{task.name}</div>
+          <div style={{ fontSize:15, fontWeight:600, color:"#1f2937", textDecoration:task.done?"line-through":"none", opacity:task.done?0.5:1 }}>{task.name||"新規タスク"}</div>
         </div>
         <button onClick={onClose} style={{ width:28, height:28, border:"none", background:"#f3f4f6", borderRadius:6, cursor:"pointer", color:"#6b7280", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{"✕"}</button>
       </div>
@@ -98,11 +129,12 @@ function TaskPanel({ task, project, setProjects, onClose }) {
           <div><label style={lab}>タスク名</label><input value={task.name} onChange={e=>up("name",e.target.value)} style={inp}/></div>
           <div><label style={lab}>担当者</label>
             <div style={{ position:"relative" }}>
-              <select value={task.assignee} onChange={e=>up("assignee",e.target.value)} style={sel}>{TEAM.map(m=><option key={m.id} value={m.id}>{m.name} - {m.role}</option>)}</select>
+              <select value={task.assignee||""} onChange={e=>up("assignee",e.target.value||null)} style={sel}><option value="">未設定</option>{TEAM.map(m=><option key={m.id} value={m.id}>{m.name} - {m.role}</option>)}</select>
               {mem&&<div style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:20, height:20, borderRadius:"50%", background:mem.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:700, color:"#fff", pointerEvents:"none" }}>{mem.av}</div>}
             </div>
           </div>
           <div><label style={lab}>フェーズ</label><select value={task.phase} onChange={e=>up("phase",e.target.value)} style={sel}>{PH_KEYS.map(k=><option key={k} value={k}>{PH[k].l}</option>)}</select></div>
+          <div><label style={lab}>ステータス</label><select value={task.taskStatus||"todo"} onChange={e=>{up("taskStatus",e.target.value);if(e.target.value==="done")up("done",true);else up("done",false)}} style={sel}>{TASK_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             <div><label style={lab}>開始日</label><input type="date" value={fmtISO(task.start)} onChange={e=>{if(e.target.value)up("start",new Date(e.target.value))}} style={inp}/></div>
             <div><label style={lab}>終了日</label><input type="date" value={fmtISO(task.end)} onChange={e=>{if(e.target.value)up("end",new Date(e.target.value))}} style={inp}/></div>
@@ -248,9 +280,133 @@ function CalView({ projects, today, onOpen }) {
   );
 }
 
+// Kanban View
+function KanbanView({ projects, setProjects, onOpen }) {
+  const [dragTask, setDragTask] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
+  const [kanbanMode, setKanbanMode] = useState("status"); // "status" or "project"
+
+  const allTasks = useMemo(() => {
+    const tasks = [];
+    projects.forEach(p => p.tasks.forEach(t => tasks.push({ ...t, projectName: p.name, projectId: p.id })));
+    return tasks;
+  }, [projects]);
+
+  const statusColumns = TASK_STATUS.map(s => ({
+    ...s,
+    type: "status",
+    tasks: allTasks.filter(t => (t.taskStatus || "todo") === s.id)
+  }));
+
+  const projectColumns = projects.map(p => ({
+    id: p.id,
+    label: p.name,
+    color: p.status === "active" ? "#10b981" : "#f59e0b",
+    type: "project",
+    tasks: p.tasks.map(t => ({ ...t, projectName: p.name, projectId: p.id }))
+  }));
+
+  const columns = kanbanMode === "status" ? statusColumns : projectColumns;
+
+  const moveTask = (taskId, newStatus) => {
+    setProjects(ps => ps.map(p => ({
+      ...p,
+      tasks: p.tasks.map(t => t.id === taskId ? { ...t, taskStatus: newStatus, done: newStatus === "done" } : t)
+    })));
+  };
+
+  const handleDragStart = (e, task) => {
+    setDragTask(task);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    if (dragTask && dragOverCol && kanbanMode === "status") {
+      moveTask(dragTask.id, dragOverCol);
+    }
+    setDragTask(null);
+    setDragOverCol(null);
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#f8f7f4" }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid #e5e7eb", background: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 11, color: "#6b7280" }}>表示:</span>
+        <div style={{ display: "flex", gap: 2, background: "#f3f4f6", borderRadius: 6, padding: 2 }}>
+          <button onClick={() => setKanbanMode("status")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: kanbanMode === "status" ? "#fff" : "transparent", color: kanbanMode === "status" ? "#1f2937" : "#6b7280", boxShadow: kanbanMode === "status" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>ステータス別</button>
+          <button onClick={() => setKanbanMode("project")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: kanbanMode === "project" ? "#fff" : "transparent", color: kanbanMode === "project" ? "#1f2937" : "#6b7280", boxShadow: kanbanMode === "project" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>プロジェクト別</button>
+        </div>
+        {kanbanMode === "status" && <span style={{ fontSize: 10, color: "#9ca3af", marginLeft: 8 }}>ドラッグでステータス変更</span>}
+      </div>
+      <div style={{ flex: 1, display: "flex", gap: 16, padding: 20, overflowX: "auto" }}>
+        {columns.map(col => (
+          <div
+            key={col.id}
+            onDragOver={e => { e.preventDefault(); if (kanbanMode === "status") setDragOverCol(col.id); }}
+            onDragLeave={() => setDragOverCol(null)}
+            onDrop={handleDragEnd}
+            style={{
+              flex: "0 0 280px",
+              background: dragOverCol === col.id ? "rgba(99,102,241,.08)" : "#fff",
+              borderRadius: 12,
+              border: dragOverCol === col.id ? "2px dashed #6366f1" : "1px solid #e5e7eb",
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "100%",
+            }}
+          >
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color }} />
+              <span style={{ fontWeight: 600, fontSize: 13, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{col.label}</span>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 10, padding: "2px 8px", flexShrink: 0 }}>{col.tasks.length}</span>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+              {col.tasks.map(task => {
+                const ph = PH[task.phase] || { c: "#666", l: "?" };
+                const mem = TEAM.find(m => m.id === task.assignee);
+                const st = TASK_STATUS.find(s => s.id === (task.taskStatus || "todo"));
+                return (
+                  <div
+                    key={task.id}
+                    draggable={kanbanMode === "status"}
+                    onDragStart={e => handleDragStart(e, task)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => onOpen(task)}
+                    style={{
+                      padding: 12,
+                      background: dragTask?.id === task.id ? "#f3f4f6" : "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      cursor: kanbanMode === "status" ? "grab" : "pointer",
+                      opacity: dragTask?.id === task.id ? 0.5 : 1,
+                      boxShadow: "0 1px 3px rgba(0,0,0,.05)",
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#1f2937", marginBottom: 8 }}>{task.name || "新規タスク"}</div>
+                    {kanbanMode === "status" && <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>{task.projectName}</div>}
+                    {kanbanMode === "project" && st && <div style={{ fontSize: 10, color: st.color, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 6, height: 6, borderRadius: "50%", background: st.color }} />{st.label}</div>}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: ph.c + "20", color: ph.c }}>{ph.l}</span>
+                      {mem && <div style={{ width: 20, height: 20, borderRadius: "50%", background: mem.color, color: "#fff", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{mem.av}</div>}
+                      <span style={{ marginLeft: "auto", fontSize: 10, color: "#9ca3af" }}>{fmtD(task.start)}〜{fmtD(task.end)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {col.tasks.length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>タスクなし</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Main
 export default function App() {
-  const [projects, setProjects] = useState(genProjects);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [view, setView] = useState("gantt");
   const [dayWidth, setDayWidth] = useState(DEFAULT_DW);
   const [filterA, setFilterA] = useState(null);
@@ -266,16 +422,139 @@ export default function App() {
   const [selIds, setSelIds] = useState(()=>new Set());
   const [marquee, setMarquee] = useState(null);
   const [mActive, setMActive] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [lastSelId, setLastSelId] = useState(null);
+  const [dragProjId, setDragProjId] = useState(null);
+  const [dragOverProjId, setDragOverProjId] = useState(null);
   const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
   const zoomLevel = getZL(DW);
 
+  // Load data from Supabase
+  const loadFromDB = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: projectsData, error: pError } = await supabase
+        .from('projects')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (pError) throw pError;
+
+      const { data: tasksData, error: tError } = await supabase
+        .from('tasks')
+        .select('*');
+      if (tError) throw tError;
+
+      if (projectsData.length === 0) {
+        // DB is empty, use demo data
+        setProjects(genProjects());
+      } else {
+        // Map DB data to app format
+        const mapped = projectsData.map(p => ({
+          id: p.id,
+          name: p.name,
+          client: p.client || '',
+          status: p.status || 'planning',
+          collapsed: p.collapsed || false,
+          tasks: tasksData
+            .filter(t => t.project_id === p.id)
+            .map(t => ({
+              id: t.id,
+              projectId: t.project_id,
+              name: t.name || '',
+              phase: t.phase || 'wire',
+              assignee: t.assignee,
+              start: new Date(t.start_date),
+              end: new Date(t.end_date),
+              done: t.done || false,
+              taskStatus: t.task_status || 'todo',
+              desc: t.description || '',
+              comments: t.comments || [],
+              estimatedHours: t.estimated_hours,
+              type: t.task_type,
+            }))
+        }));
+        setProjects(mapped);
+      }
+    } catch (err) {
+      console.error('Load error:', err);
+      setProjects(genProjects());
+    }
+    setLoading(false);
+  }, []);
+
+  // Save data to Supabase
+  const saveToDB = useCallback(async () => {
+    setSaving(true);
+    try {
+      // Delete existing data
+      await supabase.from('tasks').delete().neq('id', '');
+      await supabase.from('projects').delete().neq('id', 0);
+
+      // Insert projects
+      const projectsToInsert = projects.map((p, i) => ({
+        id: p.id,
+        name: p.name,
+        client: p.client || '',
+        status: p.status || 'planning',
+        collapsed: p.collapsed || false,
+        sort_order: i,
+      }));
+      const { error: pError } = await supabase.from('projects').insert(projectsToInsert);
+      if (pError) throw pError;
+
+      // Insert tasks
+      const tasksToInsert = projects.flatMap(p =>
+        p.tasks.map(t => ({
+          id: t.id,
+          project_id: p.id,
+          name: t.name || '',
+          phase: t.phase || 'wire',
+          assignee: t.assignee,
+          start_date: fmtISO(t.start),
+          end_date: fmtISO(t.end),
+          done: t.done || false,
+          task_status: t.taskStatus || 'todo',
+          description: t.desc || '',
+          comments: t.comments || [],
+          estimated_hours: t.estimatedHours,
+          task_type: t.type,
+        }))
+      );
+      if (tasksToInsert.length > 0) {
+        const { error: tError } = await supabase.from('tasks').insert(tasksToInsert);
+        if (tError) throw tError;
+      }
+      alert('保存しました');
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('保存に失敗しました: ' + err.message);
+    }
+    setSaving(false);
+  }, [projects]);
+
+  // Load on mount
+  useEffect(() => {
+    loadFromDB();
+  }, []);
+
   const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name};return null},[openTid,projects]);
 
-  const toggleSel = useCallback((id,e)=>{if(e&&(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n});else setSelIds(p=>(p.has(id)&&p.size===1)?new Set():new Set([id]))},[]);
   const selProject = useCallback(pid=>{const p=projects.find(x=>x.id===pid);if(!p)return;const ids=p.tasks.map(t=>t.id);setSelIds(prev=>{const allIn=ids.every(id=>prev.has(id));const n=new Set();if(!allIn)ids.forEach(id=>n.add(id));return n})},[projects]);
   const clearSel = useCallback(()=>setSelIds(new Set()),[]);
+  const moveProject = useCallback((fromId,toId)=>{
+    if(fromId===toId)return;
+    setProjects(ps=>{
+      const arr=[...ps];
+      const fromIdx=arr.findIndex(p=>p.id===fromId);
+      const toIdx=arr.findIndex(p=>p.id===toId);
+      if(fromIdx===-1||toIdx===-1)return ps;
+      const [moved]=arr.splice(fromIdx,1);
+      arr.splice(toIdx,0,moved);
+      return arr;
+    });
+  },[]);
 
   const dateRange = useMemo(()=>{let mn=new Date(today);mn.setDate(mn.getDate()-60);let mx=new Date(today);mx.setDate(mx.getDate()+120);projects.forEach(p=>p.tasks.forEach(t=>{if(new Date(t.start)<mn)mn=new Date(t.start);if(new Date(t.end)>mx)mx=new Date(t.end)}));mn.setDate(mn.getDate()-14);mx.setDate(mx.getDate()+14);const d=[],c=new Date(mn);while(c<=mx){d.push(new Date(c));c.setDate(c.getDate()+1)}return d},[projects,today]);
   const totalWidth = dateRange.length*DW;
@@ -295,9 +574,59 @@ export default function App() {
   },[dateRange,DW,zoomLevel,today]);
 
   const rowList = useMemo(()=>{
-    if(view==="timeline"){const rows=[];TEAM.forEach(m=>{const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push({...t,projName:p.name})}));if(mt.length>0){rows.push({type:"member",member:m,count:mt.length});mt.forEach(t=>rows.push({type:"task",task:t,project:{name:t.projName}}))}});return rows}
-    const r=[];filtered.forEach(p=>{r.push({type:"project",project:p});if(!p.collapsed)p.tasks.forEach(t=>r.push({type:"task",task:t,project:p}))});return r;
+    const sortByStart=(a,b)=>new Date(a.start)-new Date(b.start);
+    if(view==="timeline"){const rows=[];TEAM.forEach(m=>{const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push({...t,projName:p.name})}));if(mt.length>0){mt.sort(sortByStart);rows.push({type:"member",member:m,count:mt.length});mt.forEach(t=>rows.push({type:"task",task:t,project:{name:t.projName}}))}});return rows}
+    const r=[];filtered.forEach(p=>{r.push({type:"project",project:p});if(!p.collapsed)[...p.tasks].sort(sortByStart).forEach(t=>r.push({type:"task",task:t,project:p}))});return r;
   },[filtered,view]);
+
+  // Toggle selection with Shift range support
+  const toggleSel = useCallback((id,e)=>{
+    if(e&&e.shiftKey&&lastSelId){
+      // Shift+クリックで範囲選択
+      const taskIds=rowList.filter(r=>r.type==="task").map(r=>r.task.id);
+      const idx1=taskIds.indexOf(lastSelId);
+      const idx2=taskIds.indexOf(id);
+      if(idx1!==-1&&idx2!==-1){
+        const [start,end]=[Math.min(idx1,idx2),Math.max(idx1,idx2)];
+        const rangeIds=taskIds.slice(start,end+1);
+        setSelIds(prev=>{const n=new Set(prev);rangeIds.forEach(tid=>n.add(tid));return n});
+        return;
+      }
+    }
+    if(e&&(e.metaKey||e.ctrlKey)){
+      setSelIds(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n});
+    }else{
+      setSelIds(p=>(p.has(id)&&p.size===1)?new Set():new Set([id]));
+    }
+    setLastSelId(id);
+  },[lastSelId,rowList]);
+
+  // Create project from template
+  const createFromTemplate = useCallback((tmpl)=>{
+    const newId=Date.now();
+    const newProj={
+      id:newId,
+      name:"新規案件",
+      client:"",
+      status:"planning",
+      collapsed:false,
+      tasks:tmpl.tasks.map((t,i)=>({
+        ...t,
+        id:newId+"-"+i,
+        projectId:newId,
+        assignee:null,
+        start:addBiz(today,t.s),
+        end:addBiz(today,t.e),
+        done:false,
+        taskStatus:"todo",
+        desc:"",
+        comments:[],
+        estimatedHours:null,
+      })),
+    };
+    setProjects(ps=>[newProj,...ps]);
+    setShowNewModal(false);
+  },[today]);
 
   // Drag
   const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end)}}));setDrag({task,type:type||"move",startX:e.clientX,active,od});setDragShift(0)},[selIds,projects]);
@@ -308,6 +637,40 @@ export default function App() {
 
   // Marquee
   const handleMStart = useCallback(e=>{if(e.target.closest("[data-bar]"))return;if(e.button!==0)return;const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();setMarquee({sx:e.clientX-rect.left,sy:e.clientY-rect.top,cx:e.clientX-rect.left,cy:e.clientY-rect.top});setMActive(true);if(!(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(new Set())},[]);
+
+  // Double-click to create new task
+  const handleBodyDblClick = useCallback(e=>{
+    if(e.target.closest("[data-bar]"))return;
+    if(view==="timeline")return; // timeline view not supported yet
+    const cont=bodyRef.current;if(!cont)return;
+    const rect=cont.getBoundingClientRect();
+    const x=e.clientX-rect.left+ganttRef.current.scrollLeft;
+    const y=e.clientY-rect.top+ganttRef.current.scrollTop;
+    // Find which project row was clicked
+    let rowY=0,targetProj=null;
+    for(const row of rowList){
+      const h=row.type==="project"||row.type==="member"?44:36;
+      if(y>=rowY&&y<rowY+h){
+        if(row.type==="project")targetProj=row.project;
+        else if(row.type==="task")targetProj=row.project;
+        break;
+      }
+      rowY+=h;
+      if(row.type==="project")targetProj=row.project;
+    }
+    if(!targetProj)return;
+    // Calculate clicked date
+    const dayIndex=Math.floor(x/DW);
+    const clickedDate=dateRange[dayIndex];
+    if(!clickedDate)return;
+    // Create new task
+    const newId=targetProj.id+"-"+Date.now();
+    const startDate=new Date(clickedDate);
+    const endDate=addDays(startDate,2);
+    const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
+    setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
+    setOpenTid(newId);
+  },[view,rowList,DW,dateRange]);
   useEffect(()=>{if(!mActive||!marquee)return;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}setSelIds(hit)};const onU=()=>{setMActive(false);setMarquee(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee]);
 
   useEffect(()=>{setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)},[todayPos,view]);
@@ -360,6 +723,17 @@ export default function App() {
   const isGL=view==="gantt"||view==="timeline";
   const presets=[{l:"日",dw:40},{l:"週",dw:16},{l:"月",dw:5},{l:"四半期",dw:2},{l:"年",dw:1.5}];
 
+  if (loading) {
+    return (
+      <div style={{width:"100vw",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f8f7f4",fontFamily:"'Noto Sans JP',sans-serif"}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:24,marginBottom:16}}>読み込み中...</div>
+          <div style={{color:"#6b7280"}}>Supabaseからデータを取得しています</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{width:"100vw",height:"100vh",display:"flex",flexDirection:"column",background:"#f8f7f4",overflow:"hidden",fontFamily:"'Noto Sans JP',sans-serif",color:"#1f2937"}}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -372,6 +746,7 @@ export default function App() {
             <button style={ST.tab(view==="gantt")} onClick={()=>setView("gantt")}>{"▤ ガント"}</button>
             <button style={ST.tab(view==="timeline")} onClick={()=>setView("timeline")}>{"👤 メンバー"}</button>
             <button style={ST.tab(view==="calendar")} onClick={()=>setView("calendar")}>{"▦ カレンダー"}</button>
+            <button style={ST.tab(view==="kanban")} onClick={()=>setView("kanban")}>{"▤ カンバン"}</button>
           </div>
           {isGL&&<div style={{display:"flex",alignItems:"center",gap:8,marginLeft:8}}>
             <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:6,padding:2}}>{presets.map(p=><button key={p.l} style={{padding:"4px 8px",borderRadius:4,fontSize:10,fontWeight:500,cursor:"pointer",color:Math.abs(dayWidth-p.dw)<1?"#1f2937":"#6b7280",border:"none",background:Math.abs(dayWidth-p.dw)<1?"#e5e7eb":"transparent"}} onClick={()=>setDayWidth(p.dw)}>{p.l}</button>)}</div>
@@ -385,7 +760,8 @@ export default function App() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button style={{...ST.btnI,...(showCap?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowCap(!showCap)}>{"👥"}</button>
-          <button style={ST.btnP}>{"＋ 新規案件"}</button>
+          <button style={ST.btnP} onClick={()=>setShowNewModal(true)}>{"＋ 新規案件"}</button>
+          <button style={{...ST.btnI,background:saving?"#f3f4f6":"#fff"}} onClick={saveToDB} disabled={saving}>{saving?"保存中...":"💾 保存"}</button>
         </div>
       </div>
 
@@ -406,19 +782,19 @@ export default function App() {
       </div>}
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-        {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:(
+        {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:(
           <React.Fragment>
             <div style={ST.side}>
               <div style={{padding:"12px 16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
-                  if(row.type==="project"){const p=row.project;return(<div key={"p-"+p.id} style={ST.prow(true)}><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
+                  if(row.type==="project"){const p=row.project;const isDragOver=dragOverProjId===p.id&&dragProjId!==p.id;return(<div key={"p-"+p.id} draggable onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
                   if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{row.count}</span></div>)}
                   const t=row.task;const m=TEAM.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);const pName=row.project?.name||"";
                   return(<div key={"t-"+t.id} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{})}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)}>
                     {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
                     <div style={{width:6,height:6,borderRadius:2,flexShrink:0,background:PH[t.phase]?.c}}/>
-                    <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",opacity:t.done?0.5:1}}>{t.name}{view==="timeline"&&<span style={{color:"#9ca3af",marginLeft:6}}>{pName}</span>}</div>
+                    <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",opacity:t.done?0.5:1}}>{t.name||"新規タスク"}{view==="timeline"&&<span style={{color:"#9ca3af",marginLeft:6}}>{pName}</span>}</div>
                     {view!=="timeline"&&m&&<div style={ST.tav(m.color)}>{m.av}</div>}
                   </div>);
                 })}
@@ -431,7 +807,7 @@ export default function App() {
                 <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"6px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>{zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>:<span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{col.width>20?col.label:""}</span>}</div>))}</div>
               </div>
               <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop}}>
-                <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart}>
+                <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
                   {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
                   {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #6366f1",background:"rgba(99,102,241,.06)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
@@ -446,11 +822,11 @@ export default function App() {
                     const estRatio=hasEst?Math.min(1,(t.estimatedHours/8)/barDays):1;
                     const filledW=hasEst?Math.max(4,width*estRatio):width;
                     return(<div key={"gr-"+t.id} style={{display:"flex",position:"relative",height:36}}>
-                      {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}><div style={ST.md(ph.c,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
+                      {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}><div style={ST.md(ph.c,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name||"新規タスク"}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
                       :(<div data-bar="1" style={{...ST.bar(left,width,hasEst?ph.c+"40":ph.c,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}>
                         {hasEst&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:filledW,background:ph.c,borderRadius:estRatio>=1?"5px":"5px 0 0 5px"}}/>}
                         <div style={ST.rh("l")} onMouseDown={e=>startDrag(e,t,"resize-left")}/>
-                        {width>30&&<span style={{pointerEvents:"none",whiteSpace:"nowrap",position:"relative",zIndex:1}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&view!=="timeline"&&<span style={{opacity:0.8,marginRight:4}}>{mem.av}</span>}{t.name}</span>}
+                        {width>30&&<span style={{pointerEvents:"none",whiteSpace:"nowrap",position:"relative",zIndex:1}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&view!=="timeline"&&<span style={{opacity:0.8,marginRight:4}}>{mem.av}</span>}{t.name||"新規タスク"}</span>}
                         <div style={ST.rh("r")} onMouseDown={e=>startDrag(e,t,"resize-right")}/>
                       </div>)}
                       {!isMs&&<span style={{position:"absolute",left:left+width+12,top:10,fontSize:10,color:"#9ca3af",whiteSpace:"nowrap",pointerEvents:"none"}}>{pName}</span>}
@@ -507,6 +883,28 @@ export default function App() {
         {tip.task.type!=="milestone"&&<div style={{fontSize:11,color:hasEst?"#6366f1":"#6b7280",marginBottom:2}}>{hasEst?("⏱ 見積もり: "+tip.task.estimatedHours+"h（バー: "+days+"日間）"):("⏱ "+days+"日間（"+defH+"h）")}</div>}
         <div style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4,marginTop:2}}><div style={{width:6,height:6,borderRadius:2,background:PH[tip.task.phase]?.c}}/>{PH[tip.task.phase]?.l}</div>
       </div>)})()}
+
+      {showNewModal&&<React.Fragment>
+        <div onClick={()=>setShowNewModal(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1100}}/>
+        <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"#fff",borderRadius:12,padding:24,zIndex:1101,width:400,boxShadow:"0 20px 50px rgba(0,0,0,.2)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+            <h2 style={{fontSize:18,fontWeight:600,color:"#1f2937",margin:0}}>新規プロジェクト作成</h2>
+            <button onClick={()=>setShowNewModal(false)} style={{width:28,height:28,border:"none",background:"#f3f4f6",borderRadius:6,cursor:"pointer",color:"#6b7280",fontSize:14}}>{"✕"}</button>
+          </div>
+          <p style={{fontSize:13,color:"#6b7280",marginBottom:16}}>テンプレートを選択してください</p>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {TEMPLATES.map(t=>(
+              <button key={t.id} onClick={()=>createFromTemplate(t)} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",border:"1px solid #e5e7eb",borderRadius:8,background:"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#6366f1"} onMouseLeave={e=>e.currentTarget.style.borderColor="#e5e7eb"}>
+                <span style={{fontSize:24}}>{t.icon}</span>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:"#1f2937"}}>{t.name}</div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{t.tasks.length}個のタスク</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </React.Fragment>}
     </div>
   );
 }
