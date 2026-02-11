@@ -34,6 +34,7 @@ const TASK_STATUS = [
   {id:"done",label:"完了",color:"#10b981"},
 ];
 const TEMPLATES = [
+  {id:"blank",name:"空のプロジェクト",icon:"📁",tasks:[]},
   {id:"web",name:"Web制作（HP）",icon:"🌐",tasks:[
     {name:"ヒアリング",phase:"sales",s:0,e:1},
     {name:"ワイヤーフレーム",phase:"wire",s:2,e:6},
@@ -126,7 +127,7 @@ function TaskPanel({ task, project, setProjects, onClose }) {
           {task.type==="milestone"&&<span style={{ padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#f59e0b20", color:"#f59e0b" }}>{"◆ マイルストーン"}</span>}
         </div>
         <div style={{ display:"grid", gap:16 }}>
-          <div><label style={lab}>タスク名</label><input value={task.name} onChange={e=>up("name",e.target.value)} style={inp}/></div>
+          <div><label style={lab}>タスク名</label><input value={task.name} onChange={e=>up("name",e.target.value)} style={inp} autoFocus/></div>
           <div><label style={lab}>担当者</label>
             <div style={{ position:"relative" }}>
               <select value={task.assignee||""} onChange={e=>up("assignee",e.target.value||null)} style={sel}><option value="">未設定</option>{TEAM.map(m=><option key={m.id} value={m.id}>{m.name} - {m.role}</option>)}</select>
@@ -365,6 +366,9 @@ function KanbanView({ projects, setProjects, onOpen }) {
                 const ph = PH[task.phase] || { c: "#666", l: "?" };
                 const mem = TEAM.find(m => m.id === task.assignee);
                 const st = TASK_STATUS.find(s => s.id === (task.taskStatus || "todo"));
+                const days = diffD(task.start, task.end) + 1;
+                const hours = task.estimatedHours != null ? task.estimatedHours : days * 8;
+                const hasEst = task.estimatedHours != null;
                 return (
                   <div
                     key={task.id}
@@ -388,6 +392,7 @@ function KanbanView({ projects, setProjects, onOpen }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: ph.c + "20", color: ph.c }}>{ph.l}</span>
                       {mem && <div style={{ width: 20, height: 20, borderRadius: "50%", background: mem.color, color: "#fff", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{mem.av}</div>}
+                      <span style={{ fontSize: 10, color: hasEst ? "#6366f1" : "#9ca3af", fontWeight: hasEst ? 500 : 400 }}>{hours}h</span>
                       <span style={{ marginLeft: "auto", fontSize: 10, color: "#9ca3af" }}>{fmtD(task.start)}〜{fmtD(task.end)}</span>
                     </div>
                   </div>
@@ -395,6 +400,121 @@ function KanbanView({ projects, setProjects, onOpen }) {
               })}
               {col.tasks.length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>タスクなし</div>}
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// List View - Notion風リスト表示
+function ListView({ projects, setProjects, onOpen }) {
+  const [listMode, setListMode] = useState("project"); // "project" or "status"
+  const [collapsed, setCollapsed] = useState({});
+
+  const allTasks = useMemo(() => {
+    const tasks = [];
+    projects.forEach(p => p.tasks.forEach(t => tasks.push({ ...t, projectName: p.name, projectId: p.id })));
+    return tasks.sort((a, b) => new Date(a.start) - new Date(b.start));
+  }, [projects]);
+
+  const groups = useMemo(() => {
+    if (listMode === "project") {
+      return projects.map(p => ({
+        id: p.id,
+        label: p.name,
+        color: "#6366f1",
+        tasks: [...p.tasks].sort((a, b) => new Date(a.start) - new Date(b.start)).map(t => ({ ...t, projectName: p.name, projectId: p.id }))
+      }));
+    } else {
+      return TASK_STATUS.map(s => ({
+        id: s.id,
+        label: s.label,
+        color: s.color,
+        tasks: allTasks.filter(t => (t.taskStatus || "todo") === s.id)
+      }));
+    }
+  }, [projects, allTasks, listMode]);
+
+  const toggleGroup = (id) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const updateTask = (taskId, field, value) => {
+    setProjects(ps => ps.map(p => ({
+      ...p,
+      tasks: p.tasks.map(t => t.id === taskId ? { ...t, [field]: value, ...(field === "taskStatus" && value === "done" ? { done: true } : {}), ...(field === "taskStatus" && value !== "done" ? { done: false } : {}) } : t)
+    })));
+  };
+
+  const thStyle = { padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", position: "sticky", top: 0, zIndex: 1 };
+  const tdStyle = { padding: "10px 12px", fontSize: 12, color: "#374151", borderBottom: "1px solid #f3f4f6", verticalAlign: "middle" };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#f8f7f4" }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid #e5e7eb", background: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 11, color: "#6b7280" }}>グループ:</span>
+        <div style={{ display: "flex", gap: 2, background: "#f3f4f6", borderRadius: 6, padding: 2 }}>
+          <button onClick={() => setListMode("project")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: listMode === "project" ? "#fff" : "transparent", color: listMode === "project" ? "#1f2937" : "#6b7280", boxShadow: listMode === "project" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>プロジェクト別</button>
+          <button onClick={() => setListMode("status")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: listMode === "status" ? "#fff" : "transparent", color: listMode === "status" ? "#1f2937" : "#6b7280", boxShadow: listMode === "status" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>ステータス別</button>
+        </div>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "#6b7280" }}>{allTasks.length} タスク</span>
+      </div>
+      <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
+        {groups.map(group => (
+          <div key={group.id} style={{ marginBottom: 16, background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+            <div onClick={() => toggleGroup(group.id)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: "#fafafa", borderBottom: collapsed[group.id] ? "none" : "1px solid #e5e7eb" }}>
+              <span style={{ fontSize: 10, color: "#9ca3af", transform: collapsed[group.id] ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s" }}>{"▶"}</span>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: group.color }} />
+              <span style={{ fontWeight: 600, fontSize: 13, color: "#1f2937" }}>{group.label}</span>
+              <span style={{ fontSize: 11, color: "#6b7280", background: "#f3f4f6", borderRadius: 10, padding: "2px 8px" }}>{group.tasks.length}</span>
+            </div>
+            {!collapsed[group.id] && group.tasks.length > 0 && (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle, width: 32 }}></th>
+                    <th style={thStyle}>タスク名</th>
+                    {listMode === "status" && <th style={{ ...thStyle, width: 140 }}>プロジェクト</th>}
+                    <th style={{ ...thStyle, width: 100 }}>担当者</th>
+                    <th style={{ ...thStyle, width: 100 }}>フェーズ</th>
+                    {listMode === "project" && <th style={{ ...thStyle, width: 100 }}>ステータス</th>}
+                    <th style={{ ...thStyle, width: 160 }}>期間</th>
+                    <th style={{ ...thStyle, width: 80 }}>工数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.tasks.map(task => {
+                    const ph = PH[task.phase] || { c: "#666", l: "?" };
+                    const mem = TEAM.find(m => m.id === task.assignee);
+                    const st = TASK_STATUS.find(s => s.id === (task.taskStatus || "todo"));
+                    const days = diffD(task.start, task.end) + 1;
+                    const hours = task.estimatedHours != null ? task.estimatedHours : days * 8;
+                    const hasEst = task.estimatedHours != null;
+                    return (
+                      <tr key={task.id} style={{ cursor: "pointer" }} onClick={() => onOpen(task)} onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={tdStyle} onClick={e => { e.stopPropagation(); updateTask(task.id, "done", !task.done); }}>
+                          <div style={{ width: 18, height: 18, borderRadius: 4, border: task.done ? "none" : "2px solid #d1d5db", background: task.done ? "#10b981" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, cursor: "pointer" }}>{task.done && "✓"}</div>
+                        </td>
+                        <td style={{ ...tdStyle, fontWeight: 500, color: task.done ? "#9ca3af" : "#1f2937", textDecoration: task.done ? "line-through" : "none" }}>{task.name || "新規タスク"}</td>
+                        {listMode === "status" && <td style={{ ...tdStyle, color: "#6b7280" }}>{task.projectName}</td>}
+                        <td style={tdStyle}>
+                          {mem ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ width: 22, height: 22, borderRadius: "50%", background: mem.color, color: "#fff", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{mem.av}</div>
+                              <span style={{ fontSize: 11 }}>{mem.name}</span>
+                            </div>
+                          ) : <span style={{ color: "#9ca3af", fontSize: 11 }}>未設定</span>}
+                        </td>
+                        <td style={tdStyle}><span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: ph.c + "18", color: ph.c, fontWeight: 500 }}>{ph.l}</span></td>
+                        {listMode === "project" && <td style={tdStyle}><span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: st?.color + "18", color: st?.color, fontWeight: 500 }}>{st?.label}</span></td>}
+                        <td style={{ ...tdStyle, fontSize: 11, color: "#6b7280" }}>{fmtD(task.start)} 〜 {fmtD(task.end)} <span style={{ color: "#9ca3af" }}>({days}日)</span></td>
+                        <td style={{ ...tdStyle, fontSize: 11, color: hasEst ? "#6366f1" : "#6b7280", fontWeight: hasEst ? 500 : 400 }}>{hours}h</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            {!collapsed[group.id] && group.tasks.length === 0 && <div style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>タスクなし</div>}
           </div>
         ))}
       </div>
@@ -426,6 +546,8 @@ export default function App() {
   const [lastSelId, setLastSelId] = useState(null);
   const [dragProjId, setDragProjId] = useState(null);
   const [dragOverProjId, setDragOverProjId] = useState(null);
+  const [ctxMenu, setCtxMenu] = useState(null); // {x, y, type: 'project'|'task', id, projectId?}
+  const [delConfirm, setDelConfirm] = useState(null); // {type: 'project'|'task', id, projectId?, name}
   const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
@@ -526,10 +648,8 @@ export default function App() {
         const { error: tError } = await supabase.from('tasks').insert(tasksToInsert);
         if (tError) throw tError;
       }
-      alert('保存しました');
     } catch (err) {
       console.error('Save error:', err);
-      alert('保存に失敗しました: ' + err.message);
     }
     setSaving(false);
   }, [projects]);
@@ -538,6 +658,22 @@ export default function App() {
   useEffect(() => {
     loadFromDB();
   }, []);
+
+  // Auto-save with debounce
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (loading || projects.length === 0) return;
+
+    const timer = setTimeout(() => {
+      saveToDB();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [projects]);
 
   const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name};return null},[openTid,projects]);
 
@@ -555,6 +691,47 @@ export default function App() {
       return arr;
     });
   },[]);
+
+  // Delete project
+  const deleteProject = useCallback((pid) => {
+    const proj = projects.find(p => p.id === pid);
+    setDelConfirm({ type: 'project', id: pid, name: proj?.name || '案件' });
+    setCtxMenu(null);
+  }, [projects]);
+
+  // Delete task
+  const deleteTask = useCallback((taskId, projectId) => {
+    const proj = projects.find(p => p.id === projectId);
+    const task = proj?.tasks.find(t => t.id === taskId);
+    setDelConfirm({ type: 'task', id: taskId, projectId, name: task?.name || 'タスク' });
+    setCtxMenu(null);
+  }, [projects]);
+
+  // Execute delete confirmation
+  const confirmDelete = useCallback(() => {
+    if (!delConfirm) return;
+    if (delConfirm.type === 'project') {
+      setProjects(ps => ps.filter(p => p.id !== delConfirm.id));
+    } else {
+      setProjects(ps => ps.map(p =>
+        p.id === delConfirm.projectId ? { ...p, tasks: p.tasks.filter(t => t.id !== delConfirm.id) } : p
+      ));
+    }
+    setDelConfirm(null);
+  }, [delConfirm]);
+
+  // Context menu handler
+  const handleContextMenu = useCallback((e, type, id, projectId) => {
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY, type, id, projectId });
+  }, []);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setCtxMenu(null);
+    if (ctxMenu) window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [ctxMenu]);
 
   const dateRange = useMemo(()=>{let mn=new Date(today);mn.setDate(mn.getDate()-60);let mx=new Date(today);mx.setDate(mx.getDate()+120);projects.forEach(p=>p.tasks.forEach(t=>{if(new Date(t.start)<mn)mn=new Date(t.start);if(new Date(t.end)>mx)mx=new Date(t.end)}));mn.setDate(mn.getDate()-14);mx.setDate(mx.getDate()+14);const d=[],c=new Date(mn);while(c<=mx){d.push(new Date(c));c.setDate(c.getDate()+1)}return d},[projects,today]);
   const totalWidth = dateRange.length*DW;
@@ -632,8 +809,26 @@ export default function App() {
   const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end)}}));setDrag({task,type:type||"move",startX:e.clientX,active,od});setDragShift(0)},[selIds,projects]);
   useEffect(()=>{if(!drag)return;const onM=e=>{const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(!o)return t;if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}return t})})))};const onU=()=>{setDrag(null);setDragShift(0);setDragPos(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW]);
 
-  // Zoom
+  // Zoom - 非passiveリスナーでブラウザズームを無効化（Mac trackpad対応）
   const handleWheel = useCallback(e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const g=ganttRef.current;if(!g)return;const rect=g.getBoundingClientRect(),mx=e.clientX-rect.left,sl=g.scrollLeft,md=(sl+mx)/DW;const f=e.deltaY<0?1.15:0.87;const nDW=clamp(DW*f,MIN_DW,MAX_DW);setDayWidth(nDW);requestAnimationFrame(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=md*nDW-mx})},[DW]);
+  useEffect(()=>{const g=ganttRef.current;if(!g)return;
+    const hw=e=>{if(e.ctrlKey||e.metaKey)e.preventDefault()};
+    const hg=e=>e.preventDefault(); // Safari gesture events
+    g.addEventListener("wheel",hw,{passive:false});
+    g.addEventListener("gesturestart",hg,{passive:false});
+    g.addEventListener("gesturechange",hg,{passive:false});
+    g.addEventListener("gestureend",hg,{passive:false});
+    return()=>{g.removeEventListener("wheel",hw);g.removeEventListener("gesturestart",hg);g.removeEventListener("gesturechange",hg);g.removeEventListener("gestureend",hg)};
+  },[]);
+  // ドキュメントレベルでCtrl+ホイールをブロック（ガントエリア上のみ）
+  useEffect(()=>{
+    const hw=e=>{if((e.ctrlKey||e.metaKey)&&ganttRef.current?.contains(e.target))e.preventDefault()};
+    const hg=e=>{if(ganttRef.current?.contains(e.target))e.preventDefault()};
+    document.addEventListener("wheel",hw,{passive:false});
+    document.addEventListener("gesturestart",hg,{passive:false});
+    document.addEventListener("gesturechange",hg,{passive:false});
+    return()=>{document.removeEventListener("wheel",hw);document.removeEventListener("gesturestart",hg);document.removeEventListener("gesturechange",hg)};
+  },[]);
 
   // Marquee
   const handleMStart = useCallback(e=>{if(e.target.closest("[data-bar]"))return;if(e.button!==0)return;const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();setMarquee({sx:e.clientX-rect.left,sy:e.clientY-rect.top,cx:e.clientX-rect.left,cy:e.clientY-rect.top});setMActive(true);if(!(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(new Set())},[]);
@@ -670,10 +865,14 @@ export default function App() {
     const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
     setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
     setOpenTid(newId);
-  },[view,rowList,DW,dateRange]);
+    // 作成したタスクの日付位置にスクロールを維持
+    const targetLeft=getPos(startDate);
+    setTimeout(()=>{if(ganttRef.current){const gw=ganttRef.current.clientWidth;const currentScroll=ganttRef.current.scrollLeft;const visibleStart=currentScroll,visibleEnd=currentScroll+gw;if(targetLeft<visibleStart||targetLeft>visibleEnd-100)ganttRef.current.scrollLeft=Math.max(0,targetLeft-100)}},50);
+  },[view,rowList,DW,dateRange,getPos]);
   useEffect(()=>{if(!mActive||!marquee)return;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}setSelIds(hit)};const onU=()=>{setMActive(false);setMarquee(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee]);
 
-  useEffect(()=>{setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)},[todayPos,view]);
+  const initialScrollRef=useRef(false);
+  useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
   useEffect(()=>{const h=e=>{if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid]);
 
   const capPeriod = useMemo(()=>{
@@ -746,9 +945,11 @@ export default function App() {
             <button style={ST.tab(view==="gantt")} onClick={()=>setView("gantt")}>{"▤ ガント"}</button>
             <button style={ST.tab(view==="timeline")} onClick={()=>setView("timeline")}>{"👤 メンバー"}</button>
             <button style={ST.tab(view==="calendar")} onClick={()=>setView("calendar")}>{"▦ カレンダー"}</button>
-            <button style={ST.tab(view==="kanban")} onClick={()=>setView("kanban")}>{"▤ カンバン"}</button>
+            <button style={ST.tab(view==="kanban")} onClick={()=>setView("kanban")}>{"▣ カンバン"}</button>
+            <button style={ST.tab(view==="list")} onClick={()=>setView("list")}>{"≡ リスト"}</button>
           </div>
           {isGL&&<div style={{display:"flex",alignItems:"center",gap:8,marginLeft:8}}>
+            <button onClick={()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-20)}} style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid #6366f1",background:"rgba(99,102,241,.08)",color:"#6366f1"}}>{"📍 今日"}</button>
             <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:6,padding:2}}>{presets.map(p=><button key={p.l} style={{padding:"4px 8px",borderRadius:4,fontSize:10,fontWeight:500,cursor:"pointer",color:Math.abs(dayWidth-p.dw)<1?"#1f2937":"#6b7280",border:"none",background:Math.abs(dayWidth-p.dw)<1?"#e5e7eb":"transparent"}} onClick={()=>setDayWidth(p.dw)}>{p.l}</button>)}</div>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontSize:11,color:"#6b7280",cursor:"pointer"}} onClick={()=>setDayWidth(clamp(DW*0.7,MIN_DW,MAX_DW))}>{"−"}</span>
@@ -761,7 +962,7 @@ export default function App() {
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button style={{...ST.btnI,...(showCap?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowCap(!showCap)}>{"👥"}</button>
           <button style={ST.btnP} onClick={()=>setShowNewModal(true)}>{"＋ 新規案件"}</button>
-          <button style={{...ST.btnI,background:saving?"#f3f4f6":"#fff"}} onClick={saveToDB} disabled={saving}>{saving?"保存中...":"💾 保存"}</button>
+          {saving&&<span style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4}}>保存中...</span>}
         </div>
       </div>
 
@@ -782,16 +983,16 @@ export default function App() {
       </div>}
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-        {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:(
+        {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:(
           <React.Fragment>
             <div style={ST.side}>
               <div style={{padding:"12px 16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
-                  if(row.type==="project"){const p=row.project;const isDragOver=dragOverProjId===p.id&&dragProjId!==p.id;return(<div key={"p-"+p.id} draggable onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
+                  if(row.type==="project"){const p=row.project;const isDragOver=dragOverProjId===p.id&&dragProjId!==p.id;return(<div key={"p-"+p.id} draggable onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
                   if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{row.count}</span></div>)}
                   const t=row.task;const m=TEAM.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);const pName=row.project?.name||"";
-                  return(<div key={"t-"+t.id} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{})}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)}>
+                  return(<div key={"t-"+t.id} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{})}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                     {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
                     <div style={{width:6,height:6,borderRadius:2,flexShrink:0,background:PH[t.phase]?.c}}/>
                     <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",opacity:t.done?0.5:1}}>{t.name||"新規タスク"}{view==="timeline"&&<span style={{color:"#9ca3af",marginLeft:6}}>{pName}</span>}</div>
@@ -804,17 +1005,18 @@ export default function App() {
             <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden",background:"#f8f7f4"}}>
               <div ref={headerRef} style={{flexShrink:0,overflow:"hidden"}}>
                 <div style={{display:"flex"}}>{headerRows.top.map((g,i)=><div key={i} style={{fontSize:11,fontWeight:600,color:"#6b7280",padding:"6px 0 2px 8px",borderBottom:"1px solid #e5e7eb",background:"#fff",width:g.width,minWidth:g.width,overflow:"hidden",whiteSpace:"nowrap"}}>{g.width>40?g.label:""}</div>)}</div>
-                <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"6px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>{zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>:<span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{col.width>20?col.label:""}</span>}</div>))}</div>
+                <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"6px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>{zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>:<span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{col.width>20?col.label:""}</span>}</div>))}</div>
               </div>
               <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop}}>
                 <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
-                  {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
+                  {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
                   {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #6366f1",background:"rgba(99,102,241,.06)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
                   {rowList.map(row=>{
                     if(row.type==="project"||row.type==="member")return<div key={"gr-"+(row.project?.id||row.member?.id)} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
                     const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=right-left;
                     const ph=PH[t.phase]||{c:"#666"};const isMs=t.type==="milestone";const mem=TEAM.find(x=>x.id===t.assignee);
+                    const barColor=mem?.color||"#9ca3af"; // 担当者の色、未設定はグレー
                     const isSel=selIds.has(t.id);const isDrg=drag&&drag.active&&drag.active.has(t.id);
                     const ds=t.done?{opacity:0.4,filter:"grayscale(50%)"}:{};const pName=row.project?.name||"";
                     const barDays=diffD(t.start,t.end)+1;
@@ -822,9 +1024,9 @@ export default function App() {
                     const estRatio=hasEst?Math.min(1,(t.estimatedHours/8)/barDays):1;
                     const filledW=hasEst?Math.max(4,width*estRatio):width;
                     return(<div key={"gr-"+t.id} style={{display:"flex",position:"relative",height:36}}>
-                      {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}><div style={ST.md(ph.c,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name||"新規タスク"}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
-                      :(<div data-bar="1" style={{...ST.bar(left,width,hasEst?ph.c+"40":ph.c,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)}>
-                        {hasEst&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:filledW,background:ph.c,borderRadius:estRatio>=1?"5px":"5px 0 0 5px"}}/>}
+                      {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}><div style={ST.md(barColor,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name||"新規タスク"}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
+                      :(<div data-bar="1" style={{...ST.bar(left,width,hasEst?barColor+"40":barColor,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
+                        {hasEst&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:filledW,background:barColor,borderRadius:estRatio>=1?"5px":"5px 0 0 5px"}}/>}
                         <div style={ST.rh("l")} onMouseDown={e=>startDrag(e,t,"resize-left")}/>
                         {width>30&&<span style={{pointerEvents:"none",whiteSpace:"nowrap",position:"relative",zIndex:1}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&view!=="timeline"&&<span style={{opacity:0.8,marginRight:4}}>{mem.av}</span>}{t.name||"新規タスク"}</span>}
                         <div style={ST.rh("r")} onMouseDown={e=>startDrag(e,t,"resize-right")}/>
@@ -875,7 +1077,7 @@ export default function App() {
       {dragPos&&dragShift!==0&&<div style={{position:"fixed",background:"#fff",border:"1px solid #6366f1",borderRadius:6,padding:"6px 12px",zIndex:200,pointerEvents:"none",fontSize:12,fontWeight:600,color:"#6366f1",boxShadow:"0 4px 12px rgba(0,0,0,.15)",whiteSpace:"nowrap",left:dragPos.x,top:dragPos.y}}>{dragShift>0?"+"+dragShift+"日 →":dragShift+"日 ←"}{selCount>1?" ("+selCount+"件)":""}</div>}
 
       {tip&&!drag&&(()=>{const days=diffD(tip.task.start,tip.task.end)+1;const defH=days*8;const hasEst=tip.task.estimatedHours!=null&&tip.task.type!=="milestone";return(
-      <div style={{position:"fixed",background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,padding:"10px 14px",zIndex:100,pointerEvents:"none",boxShadow:"0 4px 12px rgba(0,0,0,.1)",minWidth:180,left:tip.x+12,top:tip.y-10}}>
+      <div style={{position:"fixed",background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,padding:"10px 14px",zIndex:100,pointerEvents:"none",boxShadow:"0 4px 12px rgba(0,0,0,.1)",minWidth:180,left:tip.x+24,top:tip.y+24}}>
         <div style={{fontSize:12,fontWeight:600,marginBottom:4,color:"#1f2937"}}>{tip.task.name}</div>
         <div style={{fontSize:11,color:"#6b7280",marginBottom:2}}>{"📁 "}{tip.project}</div>
         <div style={{fontSize:11,color:"#6b7280",marginBottom:2}}>{"📅 "}{fmtDF(tip.task.start)}{" → "}{fmtDF(tip.task.end)}</div>
@@ -883,6 +1085,23 @@ export default function App() {
         {tip.task.type!=="milestone"&&<div style={{fontSize:11,color:hasEst?"#6366f1":"#6b7280",marginBottom:2}}>{hasEst?("⏱ 見積もり: "+tip.task.estimatedHours+"h（バー: "+days+"日間）"):("⏱ "+days+"日間（"+defH+"h）")}</div>}
         <div style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4,marginTop:2}}><div style={{width:6,height:6,borderRadius:2,background:PH[tip.task.phase]?.c}}/>{PH[tip.task.phase]?.l}</div>
       </div>)})()}
+
+      {ctxMenu&&(
+        <div style={{position:"fixed",left:ctxMenu.x,top:ctxMenu.y,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",zIndex:2000,minWidth:140,padding:4}}>
+          {ctxMenu.type==="project"&&<React.Fragment>
+            <button onClick={()=>{const newId=ctxMenu.id+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.id,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
+            <button onClick={()=>{setShowNewModal(true);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📁 プロジェクトを追加"}</button>
+            <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
+            <button onClick={()=>{const p=projects.find(x=>x.id===ctxMenu.id);if(p){const name=prompt('案件名を入力',p.name);if(name){setProjects(ps=>ps.map(x=>x.id===ctxMenu.id?{...x,name}:x))}}setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 名前を編集"}</button>
+            <button onClick={()=>deleteProject(ctxMenu.id)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,color:"#ef4444"}} onMouseEnter={e=>e.currentTarget.style.background="#fef2f2"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"🗑 削除"}</button>
+          </React.Fragment>}
+          {ctxMenu.type==="task"&&<React.Fragment>
+            <button onClick={()=>{const newId=ctxMenu.projectId+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.projectId,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.projectId?{...p,tasks:[...p.tasks,newTask]}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
+            <button onClick={()=>{setOpenTid(ctxMenu.id);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 編集"}</button>
+            <button onClick={()=>deleteTask(ctxMenu.id,ctxMenu.projectId)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,color:"#ef4444"}} onMouseEnter={e=>e.currentTarget.style.background="#fef2f2"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"🗑 削除"}</button>
+          </React.Fragment>}
+        </div>
+      )}
 
       {showNewModal&&<React.Fragment>
         <div onClick={()=>setShowNewModal(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1100}}/>
@@ -898,10 +1117,30 @@ export default function App() {
                 <span style={{fontSize:24}}>{t.icon}</span>
                 <div>
                   <div style={{fontSize:14,fontWeight:600,color:"#1f2937"}}>{t.name}</div>
-                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{t.tasks.length}個のタスク</div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{t.tasks.length===0?"ゼロから始める":t.tasks.length+"個のタスク"}</div>
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      </React.Fragment>}
+
+      {delConfirm&&<React.Fragment>
+        <div onClick={()=>setDelConfirm(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1200}}/>
+        <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"#fff",borderRadius:12,padding:24,zIndex:1201,width:360,boxShadow:"0 20px 50px rgba(0,0,0,.2)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <div style={{width:40,height:40,borderRadius:"50%",background:"#fef2f2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{"🗑"}</div>
+            <div>
+              <div style={{fontSize:16,fontWeight:600,color:"#1f2937"}}>{delConfirm.type==="project"?"案件を削除":"タスクを削除"}</div>
+              <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>{delConfirm.name||"無題"}</div>
+            </div>
+          </div>
+          <p style={{fontSize:13,color:"#6b7280",marginBottom:20,lineHeight:1.6}}>
+            {delConfirm.type==="project"?"この案件とすべてのタスクが削除されます。":"このタスクが削除されます。"}この操作は取り消せません。
+          </p>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+            <button onClick={()=>setDelConfirm(null)} style={{padding:"10px 20px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:500,color:"#374151"}}>キャンセル</button>
+            <button onClick={confirmDelete} style={{padding:"10px 20px",borderRadius:8,border:"none",background:"#ef4444",cursor:"pointer",fontSize:13,fontWeight:500,color:"#fff"}}>削除する</button>
           </div>
         </div>
       </React.Fragment>}
