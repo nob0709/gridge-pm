@@ -112,7 +112,7 @@ const ST = {
   btnP:{padding:"7px 14px",borderRadius:5,fontSize:13,fontWeight:500,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",gap:6},
   fbar:{display:"flex",alignItems:"center",gap:8,padding:"10px 20px",borderBottom:"1px solid #e5e7eb",background:"#fff",flexShrink:0,flexWrap:"wrap"},
   chip:(on,c)=>({padding:"4px 10px",borderRadius:20,fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid "+(on?(c||"#6366f1"):"#e5e7eb"),background:on?(c?c+"18":"rgba(99,102,241,.08)"):"transparent",color:on?(c||"#6366f1"):"#6b7280"}),
-  sbar:on=>({display:"flex",alignItems:"center",gap:12,padding:"8px 20px",background:on?"rgba(99,102,241,.06)":"#fff",borderBottom:"1px solid "+(on?"rgba(99,102,241,.3)":"#e5e7eb"),fontSize:13,color:"#6366f1",flexShrink:0,minHeight:38}),
+  sbar:on=>({display:"flex",alignItems:"center",gap:12,padding:"8px 20px",background:on?"rgba(99,102,241,.06)":"#fff",borderBottom:"1px solid "+(on?"rgba(99,102,241,.3)":"#e5e7eb"),fontSize:13,color:"#6366f1",flexShrink:0,height:40,boxSizing:"border-box"}),
   sbtn:{padding:"3px 10px",borderRadius:4,fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid rgba(99,102,241,.4)",background:"transparent",color:"#6366f1"},
   side:{width:280,minWidth:280,borderRight:"1px solid #e5e7eb",display:"flex",flexDirection:"column",background:"#fff",zIndex:10},
   prow:isH=>({display:"flex",alignItems:"center",padding:"0 10px",height:isH?44:36,cursor:"pointer",gap:6,fontSize:isH?14:13,userSelect:"none",fontWeight:isH?600:400,background:isH?"#f9fafb":"transparent",borderBottom:isH?"1px solid #e5e7eb":"none",color:isH?"#1f2937":"#4b5563"}),
@@ -2221,11 +2221,13 @@ export default function App() {
         Object.entries(weekGroups).forEach(([wk,g])=>{
           let workload=0;
           const gStart=new Date(g.start);gStart.setHours(0,0,0,0);
-          const gEnd=new Date(g.end);gEnd.setHours(23,59,59,999);
+          const gEndFri=new Date(g.end);gEndFri.setHours(23,59,59,999);
+          const gEndSun=addDays(g.start,6);gEndSun.setHours(23,59,59,999); // 日曜まで
           projects.forEach(p=>p.tasks.forEach(t=>{
             if(t.assignee===m.id&&t.type!=="milestone"){
               const s=new Date(t.start);s.setHours(0,0,0,0);
               const e=new Date(t.end);e.setHours(23,59,59,999);
+              const gEnd=t.includeWeekends?gEndSun:gEndFri; // 土日カウント時は日曜まで
               if(s<=gEnd&&e>=gStart){
                 const os=s>gStart?s:gStart,oe=e<gEnd?e:gEnd;
                 let dInPeriod=0;
@@ -2249,11 +2251,13 @@ export default function App() {
       Object.entries(weekGroups).forEach(([wk,g])=>{
         let workload=0;
         const gStart=new Date(g.start);gStart.setHours(0,0,0,0);
-        const gEnd=new Date(g.end);gEnd.setHours(23,59,59,999);
+        const gEndFri=new Date(g.end);gEndFri.setHours(23,59,59,999);
+        const gEndSun=addDays(g.start,6);gEndSun.setHours(23,59,59,999);
         projects.forEach(p=>p.tasks.forEach(t=>{
           if(!t.assignee&&t.type!=="milestone"){
             const s=new Date(t.start);s.setHours(0,0,0,0);
             const e=new Date(t.end);e.setHours(23,59,59,999);
+            const gEnd=t.includeWeekends?gEndSun:gEndFri;
             if(s<=gEnd&&e>=gStart){
               const os=s>gStart?s:gStart,oe=e<gEnd?e:gEnd;
               let dInPeriod=0;
@@ -2291,11 +2295,13 @@ export default function App() {
 
           let workload=0;
           const pStart=new Date(periodStart);pStart.setHours(0,0,0,0);
-          const pEnd=new Date(periodEnd);pEnd.setHours(23,59,59,999);
+          const pEndFri=new Date(periodEnd);pEndFri.setHours(23,59,59,999);
+          const pEndSun=zoomLevel==="week"?addDays(periodStart,6):periodEnd;pEndSun.setHours&&pEndSun.setHours(23,59,59,999);
           projects.forEach(p=>p.tasks.forEach(t=>{
             if(t.assignee===m.id&&t.type!=="milestone"){
               const s=new Date(t.start);s.setHours(0,0,0,0);
               const e=new Date(t.end);e.setHours(23,59,59,999);
+              const pEnd=(t.includeWeekends&&zoomLevel==="week")?pEndSun:pEndFri;
               if(s<=pEnd&&e>=pStart){
                 const os=s>pStart?s:pStart,oe=e<pEnd?e:pEnd;
                 let dInPeriod=0;
@@ -2340,11 +2346,13 @@ export default function App() {
         const periodCapacity=zoomLevel==="week"?unassignedCapacity:Math.round(unassignedCapacity*workDaysInPeriod/5);
         let workload=0;
         const pStart=new Date(periodStart);pStart.setHours(0,0,0,0);
-        const pEnd=new Date(periodEnd);pEnd.setHours(23,59,59,999);
+        const pEndFri=new Date(periodEnd);pEndFri.setHours(23,59,59,999);
+        const pEndSun=zoomLevel==="week"?addDays(periodStart,6):periodEnd;if(pEndSun.setHours)pEndSun.setHours(23,59,59,999);
         projects.forEach(p=>p.tasks.forEach(t=>{
           if(!t.assignee&&t.type!=="milestone"){
             const s=new Date(t.start);s.setHours(0,0,0,0);
             const e=new Date(t.end);e.setHours(23,59,59,999);
+            const pEnd=(t.includeWeekends&&zoomLevel==="week")?pEndSun:pEndFri;
             if(s<=pEnd&&e>=pStart){
               const os=s>pStart?s:pStart,oe=e<pEnd?e:pEnd;
               let dInPeriod=0;
