@@ -548,6 +548,9 @@ export default function App() {
   const [dragOverProjId, setDragOverProjId] = useState(null);
   const [ctxMenu, setCtxMenu] = useState(null); // {x, y, type: 'project'|'task', id, projectId?}
   const [delConfirm, setDelConfirm] = useState(null); // {type: 'project'|'task', id, projectId?, name}
+  const [showAddMenu, setShowAddMenu] = useState(false); // 右上の追加ボタンのドロップダウン
+  const [showTaskModal, setShowTaskModal] = useState(false); // 新規タスク作成モーダル
+  const [taskModalProjectId, setTaskModalProjectId] = useState(null); // タスク作成先のプロジェクトID
   const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
@@ -838,19 +841,23 @@ export default function App() {
     if(e.target.closest("[data-bar]"))return;
     if(view==="timeline")return; // timeline view not supported yet
     const cont=bodyRef.current;if(!cont)return;
-    const rect=cont.getBoundingClientRect();
-    const x=e.clientX-rect.left+ganttRef.current.scrollLeft;
-    const y=e.clientY-rect.top+ganttRef.current.scrollTop;
+    const gantt=ganttRef.current;if(!gantt)return;
+    // bodyRefからの相対座標を計算（スクロール込み）
+    const ganttRect=gantt.getBoundingClientRect();
+    const x=e.clientX-ganttRect.left+gantt.scrollLeft;
+    const y=e.clientY-ganttRect.top+gantt.scrollTop;
     // Find which project row was clicked
-    let rowY=0,targetProj=null;
+    let rowY=0,targetProj=null,clickedRow=null;
     for(const row of rowList){
       const h=row.type==="project"||row.type==="member"?44:36;
       if(y>=rowY&&y<rowY+h){
+        clickedRow=row;
         if(row.type==="project")targetProj=row.project;
         else if(row.type==="task")targetProj=row.project;
         break;
       }
       rowY+=h;
+      // プロジェクト行を通過するたびに記録（折りたたまれている場合のフォールバック用）
       if(row.type==="project")targetProj=row.project;
     }
     if(!targetProj)return;
@@ -865,15 +872,14 @@ export default function App() {
     const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
     setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
     setOpenTid(newId);
-    // 作成したタスクの日付位置にスクロールを維持
-    const targetLeft=getPos(startDate);
-    setTimeout(()=>{if(ganttRef.current){const gw=ganttRef.current.clientWidth;const currentScroll=ganttRef.current.scrollLeft;const visibleStart=currentScroll,visibleEnd=currentScroll+gw;if(targetLeft<visibleStart||targetLeft>visibleEnd-100)ganttRef.current.scrollLeft=Math.max(0,targetLeft-100)}},50);
-  },[view,rowList,DW,dateRange,getPos]);
+  },[view,rowList,DW,dateRange]);
   useEffect(()=>{if(!mActive||!marquee)return;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}setSelIds(hit)};const onU=()=>{setMActive(false);setMarquee(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee]);
 
   const initialScrollRef=useRef(false);
   useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
   useEffect(()=>{const h=e=>{if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid]);
+  // グローバルクリックでドロップダウンを閉じる
+  useEffect(()=>{if(!showAddMenu)return;const h=()=>setShowAddMenu(false);setTimeout(()=>window.addEventListener("click",h),0);return()=>window.removeEventListener("click",h)},[showAddMenu]);
 
   const capPeriod = useMemo(()=>{
     if(capMode==="week"){
@@ -961,7 +967,17 @@ export default function App() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button style={{...ST.btnI,...(showCap?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowCap(!showCap)}>{"👥"}</button>
-          <button style={ST.btnP} onClick={()=>setShowNewModal(true)}>{"＋ 新規案件"}</button>
+          <div style={{position:"relative"}}>
+            <button style={ST.btnP} onClick={()=>setShowAddMenu(!showAddMenu)}>{"＋ 新規作成"}<span style={{marginLeft:4,fontSize:8}}>{"▼"}</span></button>
+            {showAddMenu&&<div style={{position:"absolute",top:"100%",right:0,marginTop:4,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",zIndex:1000,minWidth:160,padding:4}}>
+              <button onClick={()=>{setShowNewModal(true);setShowAddMenu(false)}} style={{width:"100%",padding:"10px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:13,borderRadius:4,display:"flex",alignItems:"center",gap:10}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{fontSize:16}}>{"📁"}</span><span>新規プロジェクト</span>
+              </button>
+              <button onClick={()=>{setShowTaskModal(true);setShowAddMenu(false)}} style={{width:"100%",padding:"10px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:13,borderRadius:4,display:"flex",alignItems:"center",gap:10}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{fontSize:16}}>{"✏️"}</span><span>新規タスク</span>
+              </button>
+            </div>}
+          </div>
           {saving&&<span style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4}}>保存中...</span>}
         </div>
       </div>
@@ -1118,6 +1134,37 @@ export default function App() {
                 <div>
                   <div style={{fontSize:14,fontWeight:600,color:"#1f2937"}}>{t.name}</div>
                   <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{t.tasks.length===0?"ゼロから始める":t.tasks.length+"個のタスク"}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </React.Fragment>}
+
+      {showTaskModal&&<React.Fragment>
+        <div onClick={()=>{setShowTaskModal(false);setTaskModalProjectId(null)}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1100}}/>
+        <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"#fff",borderRadius:12,padding:24,zIndex:1101,width:400,boxShadow:"0 20px 50px rgba(0,0,0,.2)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+            <h2 style={{fontSize:18,fontWeight:600,color:"#1f2937",margin:0}}>新規タスク作成</h2>
+            <button onClick={()=>{setShowTaskModal(false);setTaskModalProjectId(null)}} style={{width:28,height:28,border:"none",background:"#f3f4f6",borderRadius:6,cursor:"pointer",color:"#6b7280",fontSize:14}}>{"✕"}</button>
+          </div>
+          <p style={{fontSize:13,color:"#6b7280",marginBottom:16}}>タスクを追加するプロジェクトを選択してください</p>
+          <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:300,overflowY:"auto"}}>
+            {projects.map(p=>(
+              <button key={p.id} onClick={()=>{
+                const newId=p.id+"-"+Date.now();
+                const startDate=new Date(today);
+                const endDate=addDays(startDate,2);
+                const newTask={id:newId,projectId:p.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
+                setProjects(ps=>ps.map(proj=>proj.id===p.id?{...proj,tasks:[...proj.tasks,newTask],collapsed:false}:proj));
+                setOpenTid(newId);
+                setShowTaskModal(false);
+                setTaskModalProjectId(null);
+              }} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",border:"1px solid #e5e7eb",borderRadius:8,background:"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#6366f1"} onMouseLeave={e=>e.currentTarget.style.borderColor="#e5e7eb"}>
+                <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>
+                <div style={{flex:1,overflow:"hidden"}}>
+                  <div style={{fontSize:14,fontWeight:500,color:"#1f2937",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{p.tasks.length}個のタスク</div>
                 </div>
               </button>
             ))}
