@@ -1076,6 +1076,7 @@ export default function App() {
   const [filterA, setFilterA] = useState(new Set()); // 複数選択対応
   const [filterS, setFilterS] = useState(null);
   const [showCap, setShowCap] = useState(true);
+  const [showWorkloadOverview, setShowWorkloadOverview] = useState(false); // ガントビューでメンバー稼働一覧表示
   const [capMode, setCapMode] = useState("week"); // "day" or "week" or "month" - zoomLevelに連動
   const [capOffset, setCapOffset] = useState(0); // 0=今日/今週/今月, 1=明日/来週/来月, -1=昨日/先週/先月
   const [openTid, setOpenTid] = useState(null);
@@ -1108,7 +1109,7 @@ export default function App() {
   const [editingMember, setEditingMember] = useState(null); // 編集中のメンバー
   const [showSearch, setShowSearch] = useState(false); // 検索パネル表示
   const [searchQuery, setSearchQuery] = useState(""); // 検索クエリ
-  const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
+  const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({}), workloadOverviewRef=useRef(null);
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
   const zoomLevel = getZL(DW);
@@ -2136,9 +2137,9 @@ export default function App() {
     return caps;
   },[headerRows.bot,projects,zoomLevel,teamMembers]);
 
-  // メンバーごとの週別ワークロード計算（メンバービュー/ダッシュボード用）
+  // メンバーごとの週別ワークロード計算（メンバービュー/ダッシュボード/ガントビューワークロード表示用）
   const memberWorkloads = useMemo(()=>{
-    if(view!=="timeline"&&view!=="dashboard")return{};
+    if(view!=="timeline"&&view!=="dashboard"&&!(view==="gantt"&&showWorkloadOverview))return{};
     const result={};
 
     // 日表示の場合は週単位でグループ化
@@ -2295,7 +2296,7 @@ export default function App() {
       });
     }
     return result;
-  },[view,zoomLevel,headerRows.bot,projects,dateRange,DW,teamMembers]);
+  },[view,zoomLevel,headerRows.bot,projects,dateRange,DW,teamMembers,showWorkloadOverview]);
 
   useEffect(()=>{const pos={};let rowY=0;rowList.forEach(row=>{if(row.type==="project"||row.type==="member"){rowY+=44;return}const t=row.task;const left=getPos(t.start),right=getPos(t.end)+DW;if(t.type==="milestone")pos[t.id]={left,right:left+24,top:rowY+6,bottom:rowY+30};else pos[t.id]={left,right,top:rowY+7,bottom:rowY+29};rowY+=36});barRects.current=pos},[rowList,getPos,DW]);
 
@@ -2419,6 +2420,7 @@ export default function App() {
               <input type="range" min={Math.log(MIN_DW)} max={Math.log(MAX_DW)} step={0.01} value={Math.log(DW)} onChange={e=>setDayWidth(Math.exp(parseFloat(e.target.value)))} style={{width:60,accentColor:"#6366f1",cursor:"pointer"}}/>
               <span style={{fontSize:13,color:"#6b7280",cursor:"pointer",padding:"2px 6px",borderRadius:4}} onClick={()=>setDayWidth(clamp(DW*1.4,MIN_DW,MAX_DW))} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋"}</span>
             </div>
+            {view==="gantt"&&<button onClick={()=>setShowWorkloadOverview(!showWorkloadOverview)} style={{...ST.btnI,marginLeft:8,...(showWorkloadOverview?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} title="メンバー稼働一覧">{"📊 稼働"}</button>}
           </React.Fragment>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -2531,7 +2533,36 @@ export default function App() {
                   </div>);
                 })}</div>
               </div>
-              <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop}}>
+              {view==="gantt"&&showWorkloadOverview&&(
+                <div style={{display:"flex",flexShrink:0,borderBottom:"1px solid #d1d5db",background:"#fafafa",maxHeight:180}}>
+                  <div style={{width:200,minWidth:200,borderRight:"1px solid #e5e7eb",background:"#fff",overflowY:"auto",flexShrink:0}}>
+                    {[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？"}].map(m=>(
+                      <div key={m.id} style={{height:28,padding:"0 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"1px solid #f3f4f6"}}>
+                        <div style={{width:18,height:18,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:600,color:"#fff",flexShrink:0}}>{m.av}</div>
+                        <span style={{fontSize:11,color:"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div ref={workloadOverviewRef} style={{flex:1,overflowX:"auto",overflowY:"auto"}}>
+                    <div style={{width:totalWidth,position:"relative"}}>
+                      {[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？"}].map(m=>{
+                        const mw=memberWorkloads[m.id]||{};
+                        const maxUtil=Math.max(100,...Object.values(mw).map(w=>w.util||0));
+                        return(<div key={m.id} style={{height:28,position:"relative",borderBottom:"1px solid #f3f4f6"}}>
+                          {Object.entries(mw).map(([key,w])=>{
+                            const barHeight=maxUtil>0?Math.max(2,(w.util/maxUtil)*20):0;
+                            const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
+                            return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:2,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end"}}>
+                              <div style={{width:"calc(100% - 4px)",height:barHeight,background:capColor,opacity:0.7,borderRadius:"2px 2px 0 0"}} title={`${m.name}: ${w.workload}h / ${w.capacity}h (${w.util}%)`}/>
+                            </div>);
+                          })}
+                        </div>);
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop;if(workloadOverviewRef.current)workloadOverviewRef.current.scrollLeft=e.target.scrollLeft}}>
                 <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
                   {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
