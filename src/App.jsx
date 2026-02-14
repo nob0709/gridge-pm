@@ -12,6 +12,26 @@ const same = (a, b) => new Date(a).toDateString() === new Date(b).toDateString()
 const getMon = d => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() - day + (day === 0 ? -6 : 1)); return x; };
 const DN = ["日","月","火","水","木","金","土"];
 const MN = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+// 日本の祝日データ（2025-2027年）
+const JP_HOLIDAYS = {
+  // 2025年
+  "2025-01-01":"元日","2025-01-13":"成人の日","2025-02-11":"建国記念の日","2025-02-23":"天皇誕生日","2025-02-24":"振替休日",
+  "2025-03-20":"春分の日","2025-04-29":"昭和の日","2025-05-03":"憲法記念日","2025-05-04":"みどりの日","2025-05-05":"こどもの日",
+  "2025-05-06":"振替休日","2025-07-21":"海の日","2025-08-11":"山の日","2025-09-15":"敬老の日","2025-09-23":"秋分の日",
+  "2025-10-13":"スポーツの日","2025-11-03":"文化の日","2025-11-23":"勤労感謝の日","2025-11-24":"振替休日",
+  // 2026年
+  "2026-01-01":"元日","2026-01-12":"成人の日","2026-02-11":"建国記念の日","2026-02-23":"天皇誕生日",
+  "2026-03-20":"春分の日","2026-04-29":"昭和の日","2026-05-03":"憲法記念日","2026-05-04":"みどりの日","2026-05-05":"こどもの日",
+  "2026-05-06":"振替休日","2026-07-20":"海の日","2026-08-11":"山の日","2026-09-21":"敬老の日","2026-09-22":"国民の休日",
+  "2026-09-23":"秋分の日","2026-10-12":"スポーツの日","2026-11-03":"文化の日","2026-11-23":"勤労感謝の日",
+  // 2027年
+  "2027-01-01":"元日","2027-01-11":"成人の日","2027-02-11":"建国記念の日","2027-02-23":"天皇誕生日",
+  "2027-03-21":"春分の日","2027-03-22":"振替休日","2027-04-29":"昭和の日","2027-05-03":"憲法記念日","2027-05-04":"みどりの日",
+  "2027-05-05":"こどもの日","2027-07-19":"海の日","2027-08-11":"山の日","2027-09-20":"敬老の日","2027-09-23":"秋分の日",
+  "2027-10-11":"スポーツの日","2027-11-03":"文化の日","2027-11-23":"勤労感謝の日",
+};
+const isHoliday = d => { const key = fmtISO(d); return JP_HOLIDAYS[key] || null; };
 const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
 const timeNow = () => { const d = new Date(); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); };
 
@@ -1568,7 +1588,7 @@ export default function App() {
 
   const headerRows = useMemo(()=>{
     const top=[],bot=[];
-    if(zoomLevel==="day"){let cm=null;dateRange.forEach(d=>{const k=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==k){cm={key:k,label:d.getFullYear()+"年 "+MN[d.getMonth()],count:0};top.push(cm)}cm.count++;bot.push({label:d.getDate().toString(),sub:DN[d.getDay()],isWE:isWE(d),isToday:same(d,today),width:DW})});top.forEach(g=>{g.width=g.count*DW})}
+    if(zoomLevel==="day"){let cm=null;dateRange.forEach(d=>{const k=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==k){cm={key:k,label:d.getFullYear()+"年 "+MN[d.getMonth()],count:0};top.push(cm)}cm.count++;const hol=isHoliday(d);bot.push({label:d.getDate().toString(),sub:DN[d.getDay()],isWE:isWE(d),isHoliday:hol,isToday:same(d,today),width:DW})});top.forEach(g=>{g.width=g.count*DW})}
     else if(zoomLevel==="week"){let cm=null,cw=null;dateRange.forEach(d=>{const mk=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==mk){cm={key:mk,label:MN[d.getMonth()],count:0};top.push(cm)}cm.count++;const wk=getMon(d),wkk=wk.toDateString();if(!cw||cw.key!==wkk){cw={key:wkk,label:fmtD(wk)+"〜",isToday:false,days:0};bot.push(cw)}cw.days++;if(same(d,today))cw.isToday=true});top.forEach(g=>{g.width=g.count*DW});bot.forEach(w=>{w.width=w.days*DW})}
     else{let cy=null,cm=null;dateRange.forEach(d=>{const yk=d.getFullYear().toString();if(!cy||cy.key!==yk){cy={key:yk,label:yk+"年",count:0};top.push(cy)}cy.count++;const mk=d.getFullYear()+"-"+d.getMonth();if(!cm||cm.key!==mk){cm={key:mk,label:MN[d.getMonth()],isToday:false,days:0};bot.push(cm)}cm.days++;if(same(d,today))cm.isToday=true});top.forEach(g=>{g.width=g.count*DW});bot.forEach(m=>{m.width=m.days*DW})}
     return{top,bot};
@@ -2544,7 +2564,9 @@ export default function App() {
                 <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>{
                   const cap=zoomLevel!=="day"?headerCapacities[col.key]:null;
                   const capColor=cap?(cap.util>100?"#ef4444":cap.util>80?"#f59e0b":"#10b981"):"#10b981";
-                  return(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"4px 2px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>
+                  const holBg=col.isHoliday?"#fef2f2":col.isWE?"#f9fafb":"#fff";
+                  const holColor=col.isToday?"#6366f1":col.isHoliday?"#ef4444":"#6b7280";
+                  return(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",fontSize:zoomLevel==="day"?10:11,color:holColor,fontWeight:col.isToday||col.isHoliday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"4px 2px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:holBg,opacity:(col.isWE||col.isHoliday)&&!col.isToday?0.8:1,overflow:"hidden"}} title={col.isHoliday||""}>
                     {zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>
                     :<React.Fragment>
                       <span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{col.width>20?col.label:""}</span>
@@ -2580,7 +2602,7 @@ export default function App() {
               <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop;if(workloadGanttRef.current)workloadGanttRef.current.scrollLeft=e.target.scrollLeft}}>
                 <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
-                  {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
+                  {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":isHoliday(d)?"#fef2f2":"transparent"}}/>)}</div>}
                   {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #6366f1",background:"rgba(99,102,241,.06)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
                   {depLines.length>0&&<svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:2}}>
                     <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9ca3af"/></marker></defs>
