@@ -978,14 +978,17 @@ export default function App() {
     setOpenTid(newId);
   },[view,rowList,DW,dateRange]);
 
-  useEffect(()=>{if(!mActive||!marquee)return;let lastHit=new Set();let lastCx=marquee.cx,lastCy=marquee.cy;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;lastCx=x;lastCy=y;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}lastHit=hit;setSelIds(hit)};const onU=()=>{
+  useEffect(()=>{if(!mActive||!marquee)return;let lastCx=marquee.cx,lastCy=marquee.cy;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;lastCx=x;lastCy=y;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}setSelIds(hit)};const onU=()=>{
     // ドラッグ終了時：選択タスクがなく、一定の幅があれば新規タスク作成
-    // lastCx/lastCyを使用して最新の座標を確実に取得
     const mx1=Math.min(marquee.sx,lastCx),my1=Math.min(marquee.sy,lastCy),mx2=Math.max(marquee.sx,lastCx),my2=Math.max(marquee.sy,lastCy);
     const dragW=mx2-mx1;
-    if(lastHit.size===0&&dragW>10){
-      createTaskFromDrag(mx1,my1,mx2,my2,marquee.scrollX||0,marquee.scrollY||0);
-    }
+    // selIdsの現在値を直接チェック（クロージャー問題を回避）
+    setSelIds(currentSel=>{
+      if(currentSel.size===0&&dragW>10){
+        createTaskFromDrag(mx1,my1,mx2,my2,marquee.scrollX||0,marquee.scrollY||0);
+      }
+      return currentSel;
+    });
     setMActive(false);setMarquee(null);
   };window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee,createTaskFromDrag]);
 
