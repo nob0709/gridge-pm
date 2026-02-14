@@ -101,12 +101,13 @@ const ST = {
 };
 
 // Task Detail Panel
-function TaskPanel({ task, project, setProjects, onClose }) {
+function TaskPanel({ task, project, projectTasks, setProjects, onClose }) {
   const [comment, setComment] = useState("");
   const endRef = useRef(null);
   const mem = TEAM.find(x => x.id === task.assignee);
   const ph = PH[task.phase] || { l:"?", c:"#666" };
   const up = useCallback((f, v) => setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, [f]: v } : t) }))), [task.id, setProjects]);
+  const otherTasks = projectTasks.filter(t => t.id !== task.id); // 自分以外のタスク
   const addC = () => { if (!comment.trim()) return; const c = { id: Date.now(), text: comment.trim(), author: "shimizu", time: timeNow() }; setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, comments: [...(t.comments||[]), c] } : t) }))); setComment(""); setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50); };
   const inp = { width:"100%", padding:"8px 10px", borderRadius:6, border:"1px solid #e5e7eb", background:"#fff", color:"#1f2937", fontSize:13, fontFamily:"inherit", outline:"none" };
   const sel = { ...inp, cursor:"pointer" };
@@ -136,6 +137,7 @@ function TaskPanel({ task, project, setProjects, onClose }) {
           </div>
           <div><label style={lab}>フェーズ</label><select value={task.phase} onChange={e=>up("phase",e.target.value)} style={sel}>{PH_KEYS.map(k=><option key={k} value={k}>{PH[k].l}</option>)}</select></div>
           <div><label style={lab}>ステータス</label><select value={task.taskStatus||"todo"} onChange={e=>{up("taskStatus",e.target.value);if(e.target.value==="done")up("done",true);else up("done",false)}} style={sel}>{TASK_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
+          <div><label style={lab}>タイプ</label><select value={task.type||"task"} onChange={e=>{const v=e.target.value;up("type",v==="task"?undefined:v);if(v==="milestone")up("end",task.start)}} style={sel}><option value="task">通常タスク</option><option value="milestone">マイルストーン</option></select></div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             <div><label style={lab}>開始日</label><input type="date" value={fmtISO(task.start)} onChange={e=>{if(e.target.value)up("start",new Date(e.target.value))}} style={inp}/></div>
             <div><label style={lab}>終了日</label><input type="date" value={fmtISO(task.end)} onChange={e=>{if(e.target.value)up("end",new Date(e.target.value))}} style={inp}/></div>
@@ -149,6 +151,18 @@ function TaskPanel({ task, project, setProjects, onClose }) {
             </div>
             {task.estimatedHours!=null&&<div style={{ fontSize:10, color:"#6366f1", marginTop:4 }}>{"⏱ 実工数: "+task.estimatedHours+"h / バー: "+(diffD(task.start,task.end)+1)+"日間（"+(diffD(task.start,task.end)+1)*8+"h）"}</div>}
           </div>}
+          <div>
+            <label style={lab}>依存タスク（このタスクの前に完了が必要）</label>
+            {otherTasks.length>0?<div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:120,overflowY:"auto",padding:4,background:"#f9fafb",borderRadius:6}}>
+              {otherTasks.map(t=>{const isDep=(task.dependencies||[]).includes(t.id);return(
+                <label key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:4,cursor:"pointer",background:isDep?"rgba(99,102,241,.1)":"transparent"}} onClick={()=>{const deps=task.dependencies||[];up("dependencies",isDep?deps.filter(d=>d!==t.id):[...deps,t.id])}}>
+                  <div style={{width:16,height:16,borderRadius:4,border:isDep?"none":"1.5px solid #d1d5db",background:isDep?"#6366f1":"#fff",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,flexShrink:0}}>{isDep&&"✓"}</div>
+                  <span style={{fontSize:12,color:"#374151",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.type==="milestone"?"◆ ":""}{t.name||"無題"}</span>
+                </label>
+              )})}
+            </div>:<div style={{fontSize:12,color:"#9ca3af",padding:8}}>他にタスクがありません</div>}
+            {(task.dependencies||[]).length>0&&<div style={{fontSize:10,color:"#6366f1",marginTop:6}}>{(task.dependencies||[]).length}件の依存タスク</div>}
+          </div>
           <div><label style={lab}>説明・メモ</label><textarea value={task.desc||""} onChange={e=>up("desc",e.target.value)} placeholder="タスクの詳細、注意事項など..." rows={4} style={{...inp,resize:"vertical",lineHeight:1.6}}/></div>
         </div>
         <div style={{ marginTop:24 }}>
@@ -678,7 +692,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [projects]);
 
-  const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name};return null},[openTid,projects]);
+  const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name,projectTasks:p.tasks};return null},[openTid,projects]);
 
   const selProject = useCallback(pid=>{const p=projects.find(x=>x.id===pid);if(!p)return;const ids=p.tasks.map(t=>t.id);setSelIds(prev=>{const allIn=ids.every(id=>prev.has(id));const n=new Set();if(!allIn)ids.forEach(id=>n.add(id));return n})},[projects]);
   const clearSel = useCallback(()=>setSelIds(new Set()),[]);
@@ -1005,6 +1019,36 @@ export default function App() {
   useEffect(()=>{const pos={};let rowY=0;rowList.forEach(row=>{if(row.type==="project"||row.type==="member"){rowY+=44;return}const t=row.task;const left=getPos(t.start),right=getPos(t.end)+DW;if(t.type==="milestone")pos[t.id]={left,right:left+24,top:rowY+6,bottom:rowY+30};else pos[t.id]={left,right,top:rowY+7,bottom:rowY+29};rowY+=36});barRects.current=pos},[rowList,getPos,DW]);
 
   const mRect=marquee?{left:Math.min(marquee.sx,marquee.cx),top:Math.min(marquee.sy,marquee.cy),width:Math.abs(marquee.cx-marquee.sx),height:Math.abs(marquee.cy-marquee.sy)}:null;
+
+  // 依存関係の線を計算
+  const depLines = useMemo(()=>{
+    const lines=[];
+    const taskPos={}; // タスクIDごとの位置
+    let rowY=0;
+    rowList.forEach(row=>{
+      if(row.type==="project"||row.type==="member"){rowY+=44;return}
+      const t=row.task;
+      const left=getPos(t.start),right=getPos(t.end)+DW;
+      const centerY=rowY+(t.type==="milestone"?18:18);
+      taskPos[t.id]={left,right:t.type==="milestone"?left+14:right,centerY};
+      rowY+=36;
+    });
+    // 依存関係の線を生成
+    rowList.forEach(row=>{
+      if(row.type!=="task")return;
+      const t=row.task;
+      const deps=t.dependencies||[];
+      deps.forEach(depId=>{
+        const from=taskPos[depId];
+        const to=taskPos[t.id];
+        if(from&&to){
+          lines.push({fromX:from.right,fromY:from.centerY,toX:to.left,toY:to.centerY,id:depId+"-"+t.id});
+        }
+      });
+    });
+    return lines;
+  },[rowList,getPos,DW]);
+
   const selCount=selIds.size;
   const isGL=view==="gantt"||view==="timeline";
   const presets=[{l:"日",dw:40},{l:"週",dw:16},{l:"月",dw:5},{l:"四半期",dw:2},{l:"年",dw:1.5}];
@@ -1109,6 +1153,16 @@ export default function App() {
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
                   {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
                   {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #6366f1",background:"rgba(99,102,241,.06)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
+                  {depLines.length>0&&<svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:2}}>
+                    <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9ca3af"/></marker></defs>
+                    {depLines.map(l=>{
+                      const midX=(l.fromX+l.toX)/2;
+                      const path=l.fromX<l.toX-10
+                        ?`M${l.fromX},${l.fromY} C${midX},${l.fromY} ${midX},${l.toY} ${l.toX},${l.toY}`
+                        :`M${l.fromX},${l.fromY} L${l.fromX+15},${l.fromY} L${l.fromX+15},${l.toY>l.fromY?l.fromY+20:l.fromY-20} L${l.toX-15},${l.toY>l.fromY?l.fromY+20:l.fromY-20} L${l.toX-15},${l.toY} L${l.toX},${l.toY}`;
+                      return<path key={l.id} d={path} fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="4,2" markerEnd="url(#arrowhead)"/>;
+                    })}
+                  </svg>}
                   {rowList.map(row=>{
                     if(row.type==="project"||row.type==="member")return<div key={"gr-"+(row.project?.id||row.member?.id)} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
                     const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=Math.max(4,right-left);
@@ -1168,7 +1222,7 @@ export default function App() {
         )}
       </div>
 
-      {openTask&&<TaskPanel task={openTask.task} project={openTask.project} setProjects={setProjects} onClose={()=>setOpenTid(null)}/>}
+      {openTask&&<TaskPanel task={openTask.task} project={openTask.project} projectTasks={openTask.projectTasks} setProjects={setProjects} onClose={()=>setOpenTid(null)}/>}
       {openTask&&<div onClick={()=>setOpenTid(null)} style={{position:"fixed",top:0,left:0,right:440,bottom:0,zIndex:999,background:"rgba(0,0,0,.1)"}}/>}
 
       {dragPos&&dragShift!==0&&<div style={{position:"fixed",background:"#fff",border:"1px solid #6366f1",borderRadius:6,padding:"6px 12px",zIndex:200,pointerEvents:"none",fontSize:12,fontWeight:600,color:"#6366f1",boxShadow:"0 4px 12px rgba(0,0,0,.15)",whiteSpace:"nowrap",left:dragPos.x,top:dragPos.y}}>{dragShift>0?"+"+dragShift+"日 →":dragShift+"日 ←"}{selCount>1?" ("+selCount+"件)":""}</div>}
