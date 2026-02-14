@@ -623,7 +623,7 @@ export default function App() {
               comments: t.comments || [],
               estimatedHours: t.estimated_hours,
               type: t.task_type,
-              // dependencies: t.dependencies || [], // TODO: DBにカラム追加後に有効化
+              dependencies: t.dependencies || [],
             }))
         }));
         setProjects(mapped);
@@ -716,7 +716,7 @@ export default function App() {
           comments: t.comments || [],
           estimated_hours: t.estimatedHours,
           task_type: t.type,
-          // dependencies: t.dependencies || [], // TODO: DBにカラム追加後に有効化
+          dependencies: t.dependencies || [],
         }))
       );
       if (tasksToUpsert.length > 0) {
