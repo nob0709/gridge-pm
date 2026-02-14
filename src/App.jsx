@@ -623,7 +623,7 @@ export default function App() {
               comments: t.comments || [],
               estimatedHours: t.estimated_hours,
               type: t.task_type,
-              dependencies: t.dependencies || [],
+              // dependencies: t.dependencies || [], // TODO: DBにカラム追加後に有効化
             }))
         }));
         setProjects(mapped);
@@ -700,30 +700,24 @@ export default function App() {
         }
       }
 
-      // タスクをupsert（dependenciesは存在しない場合に備えて除外可能に）
+      // タスクをupsert（dependenciesはDBカラム追加後に有効化）
       const tasksToUpsert = projects.flatMap(p =>
-        p.tasks.map(t => {
-          const task = {
-            id: t.id,
-            project_id: p.id,
-            name: t.name || '',
-            phase: t.phase || 'wire',
-            assignee: t.assignee,
-            start_date: fmtISO(t.start),
-            end_date: fmtISO(t.end),
-            done: t.done || false,
-            task_status: t.taskStatus || 'todo',
-            description: t.desc || '',
-            comments: t.comments || [],
-            estimated_hours: t.estimatedHours,
-            task_type: t.type,
-          };
-          // dependenciesカラムがある場合のみ追加
-          if (t.dependencies && t.dependencies.length > 0) {
-            task.dependencies = t.dependencies;
-          }
-          return task;
-        })
+        p.tasks.map(t => ({
+          id: t.id,
+          project_id: p.id,
+          name: t.name || '',
+          phase: t.phase || 'wire',
+          assignee: t.assignee,
+          start_date: fmtISO(t.start),
+          end_date: fmtISO(t.end),
+          done: t.done || false,
+          task_status: t.taskStatus || 'todo',
+          description: t.desc || '',
+          comments: t.comments || [],
+          estimated_hours: t.estimatedHours,
+          task_type: t.type,
+          // dependencies: t.dependencies || [], // TODO: DBにカラム追加後に有効化
+        }))
       );
       if (tasksToUpsert.length > 0) {
         console.log('Upserting tasks:', tasksToUpsert.length);
