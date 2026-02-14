@@ -335,11 +335,12 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
     }
   }, [weeks, today, calMode]);
 
-  // ドラッグでタスク移動
-  const handleDragStart = (e, t, weekStart) => {
+  // ドラッグでタスク移動・リサイズ
+  const handleDragStart = (e, t, weekStart, type = "move") => {
     e.stopPropagation();
-    const rect = e.currentTarget.parentElement.getBoundingClientRect();
-    setDrag({ taskId: t.id, projectId: t.projectId, startX: e.clientX, cellWidth: rect.width / 7, origStart: new Date(t.start), origEnd: new Date(t.end), weekStart });
+    e.preventDefault();
+    const rect = e.currentTarget.closest("[data-week-row]")?.getBoundingClientRect() || e.currentTarget.parentElement.getBoundingClientRect();
+    setDrag({ taskId: t.id, projectId: t.projectId, startX: e.clientX, cellWidth: rect.width / 7, origStart: new Date(t.start), origEnd: new Date(t.end), weekStart, type });
   };
 
   useEffect(() => {
@@ -354,8 +355,16 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
           if (t.id !== drag.taskId) return t;
           const newStart = new Date(drag.origStart);
           const newEnd = new Date(drag.origEnd);
-          newStart.setDate(newStart.getDate() + dayShift);
-          newEnd.setDate(newEnd.getDate() + dayShift);
+          if (drag.type === "resize-left") {
+            newStart.setDate(newStart.getDate() + dayShift);
+            if (newStart > newEnd) return t; // 開始が終了を超えないように
+          } else if (drag.type === "resize-right") {
+            newEnd.setDate(newEnd.getDate() + dayShift);
+            if (newEnd < newStart) return t; // 終了が開始を超えないように
+          } else {
+            newStart.setDate(newStart.getDate() + dayShift);
+            newEnd.setDate(newEnd.getDate() + dayShift);
+          }
           return { ...t, start: newStart, end: newEnd };
         })
       })));
@@ -442,7 +451,7 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
               const rows = weekTasks[wi] || [];
               const contentH = calMode === "week" ? Math.max(rows.length * (ROW_H + ROW_GAP) + 16, 200) : Math.max(rows.length * (ROW_H + ROW_GAP) + 8, 60);
               return (
-                <div key={wi} style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", position: "relative", minHeight: calMode === "week" ? "calc(100vh - 160px)" : undefined }}>
+                <div key={wi} data-week-row="true" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", position: "relative", minHeight: calMode === "week" ? "calc(100vh - 160px)" : undefined }}>
                   {week.map((d, di) => {
                     const isT = same(d, today);
                     const isWeekend = di >= 5;
@@ -465,8 +474,15 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
                     const width = `calc(${t.span} * 100% / 7 - 8px)`;
                     const isDragging = drag?.taskId === t.id;
                     return (
-                      <div key={t.id + "-" + wi} onMouseDown={(e) => handleDragStart(e, t, week[0])} onClick={() => !drag && onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: calMode === "week" ? 11 : 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: isDragging ? "grabbing" : "grab", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: isDragging ? "0 4px 12px rgba(0,0,0,.2)" : "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: isDragging ? 10 : 2, transform: isDragging ? "scale(1.02)" : "none" }}>
-                        {mem && <span style={{ marginRight: 4, opacity: 0.9 }}>{mem.av}</span>}{t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
+                      <div key={t.id + "-" + wi} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: calMode === "week" ? 11 : 10, fontWeight: 500, display: "flex", alignItems: "center", boxShadow: isDragging ? "0 4px 12px rgba(0,0,0,.2)" : "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: isDragging ? 10 : 2, transform: isDragging ? "scale(1.02)" : "none" }}>
+                        {/* 左リサイズハンドル */}
+                        <div onMouseDown={(e) => handleDragStart(e, t, week[0], "resize-left")} style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 8, cursor: "ew-resize", borderRadius: "4px 0 0 4px" }} />
+                        {/* メインエリア（移動用） */}
+                        <div onMouseDown={(e) => handleDragStart(e, t, week[0], "move")} onClick={() => !drag && onOpen(t)} style={{ flex: 1, padding: "0 10px", cursor: isDragging ? "grabbing" : "grab", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", display: "flex", alignItems: "center" }}>
+                          {mem && <span style={{ marginRight: 4, opacity: 0.9 }}>{mem.av}</span>}{t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
+                        </div>
+                        {/* 右リサイズハンドル */}
+                        <div onMouseDown={(e) => handleDragStart(e, t, week[0], "resize-right")} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 8, cursor: "ew-resize", borderRadius: "0 4px 4px 0" }} />
                       </div>
                     );
                   }))}
