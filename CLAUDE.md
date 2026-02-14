@@ -65,9 +65,22 @@ Vite + React で構築。現在は単一ファイル（src/App.jsx）のフロ�
 - `npx vercel --prod` - Vercelへ本番デプロイ
 
 ## デプロイ
-- **Vercel** を使用（`npx vercel --prod`）
+- **Vercel Pro** を使用（`npx vercel --prod`）
 - GitHubにプッシュ後、手動でデプロイが必要
 - 本番URL: https://gridge-pm.vercel.app
+
+## URL状態管理
+- ビューとフィルター状態がURLハッシュに保存される
+- 例: `https://gridge-pm.vercel.app/#view=timeline&member=nakata`
+- リロードしても同じ画面が維持される
+
+## Supabaseテーブル
+### tasks テーブルの主要カラム
+- `id`, `project_id`, `name`, `phase`, `assignee`
+- `start_date`, `end_date`, `done`, `task_status`
+- `description`, `comments`, `estimated_hours`
+- `task_type`, `dependencies`
+- `include_weekends` (boolean) - 土日カウントフラグ
 
 ## ワークロード計算ルール
 - デフォルト: 土日はカウントしない（平日のみ）
@@ -84,8 +97,12 @@ Vite + React で構築。現在は単一ファイル（src/App.jsx）のフロ�
 ## 最近の更新（2026-02-14）
 - ガントビューにメンバー稼働一覧を追加（📊稼働ボタンで表示切替）
 - ワークロード表示を固定高さ（5人分）で独立スクロール可能に
-- 日本の祝日表示を追加
-- タスクごとの「土日カウント」オプション追加
+- 日本の祝日表示を追加（2025-2027年対応）
+- タスクごとの「土日カウント」オプション追加（Supabase保存対応）
 - ワークロード計算の日付比較バグ修正（金曜日がカウントされない問題）
+- 土日カウント時の週範囲を日曜まで拡張
+- URL状態管理（ビュー・フィルターをURLハッシュに保存）
+- 選択バーの高さ固定（タスク選択時のガタつき解消）
 - 検索機能（コピー可能なフォーマット）
 - タスク作成日・更新日の表示
+- Vercel Proに移行
