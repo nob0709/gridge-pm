@@ -295,8 +295,9 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
   const weeksData = useMemo(() => {
     if (calMode === "day") return [];
     if (calMode === "week") return [{ week: currentWeek, monthOffset: 0, isFirstWeekOfMonth: false }];
-    // 月表示：複数月の週を生成
+    // 月表示：複数月の週を生成（重複排除）
     const result = [];
+    const addedWeeks = new Set(); // 追加済みの週を追跡（月曜日の日付をキーとして使用）
     for (let m = monthRange.start; m <= monthRange.end; m++) {
       const d = new Date(today);
       d.setMonth(d.getMonth() + m);
@@ -308,10 +309,19 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
       const c = new Date(mon);
       let isFirst = true;
       while (c <= lastDay || c.getDay() !== 1) {
-        const week = [];
-        for (let i = 0; i < 7; i++) { week.push(new Date(c)); c.setDate(c.getDate() + 1); }
-        result.push({ week, monthOffset: m, monthLabel: `${year}年${month + 1}月`, isFirstWeekOfMonth: isFirst });
-        isFirst = false;
+        const weekKey = c.toISOString().split('T')[0]; // 月曜日の日付をキーに
+        if (!addedWeeks.has(weekKey)) {
+          addedWeeks.add(weekKey);
+          const week = [];
+          const weekStart = new Date(c);
+          for (let i = 0; i < 7; i++) { week.push(new Date(c)); c.setDate(c.getDate() + 1); }
+          result.push({ week, monthOffset: m, monthLabel: `${year}年${month + 1}月`, isFirstWeekOfMonth: isFirst });
+          isFirst = false;
+        } else {
+          // 既に追加済みの週はスキップ（カーソルを進める）
+          c.setDate(c.getDate() + 7);
+          isFirst = false;
+        }
         if (c > lastDay && c.getDay() === 1) break;
       }
     }
