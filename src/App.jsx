@@ -1096,9 +1096,19 @@ export default function App() {
   // Undo/Redo可能かどうか
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < historyRef.current.length - 1;
-  const [view, setView] = useState("gantt");
+  // URL hashから初期状態を読み込み
+  const getInitialState = () => {
+    const hash = window.location.hash.slice(1);
+    const params = new URLSearchParams(hash);
+    return {
+      view: params.get('view') || 'gantt',
+      filterA: params.get('member') ? new Set(params.get('member').split(',')) : new Set(),
+    };
+  };
+  const initialState = getInitialState();
+  const [view, setView] = useState(initialState.view);
   const [dayWidth, setDayWidth] = useState(DEFAULT_DW);
-  const [filterA, setFilterA] = useState(new Set()); // 複数選択対応
+  const [filterA, setFilterA] = useState(initialState.filterA); // 複数選択対応
   const [filterS, setFilterS] = useState(null);
   const [showCap, setShowCap] = useState(true);
   const [showWorkloadOverview, setShowWorkloadOverview] = useState(false); // ガントビューでメンバー稼働一覧表示
@@ -1224,6 +1234,7 @@ export default function App() {
               estimatedHours: t.estimated_hours,
               type: t.task_type,
               dependencies: t.dependencies || [],
+              includeWeekends: t.include_weekends || false,
             }))
         }));
         setProjects(mapped);
@@ -1317,6 +1328,7 @@ export default function App() {
           estimated_hours: t.estimatedHours,
           task_type: t.type,
           dependencies: t.dependencies || [],
+          include_weekends: t.includeWeekends || false,
         }))
       );
       if (tasksToUpsert.length > 0) {
@@ -1381,6 +1393,19 @@ export default function App() {
   useEffect(() => {
     loadFromDB();
   }, []);
+
+  // URL hashを更新（ビュー・フィルター変更時）
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('view', view);
+    if (filterA.size > 0) {
+      params.set('member', [...filterA].join(','));
+    }
+    const newHash = params.toString();
+    if (window.location.hash.slice(1) !== newHash) {
+      window.history.replaceState(null, '', '#' + newHash);
+    }
+  }, [view, filterA]);
 
   // Auto-save with debounce
   const isFirstRender = useRef(true);
