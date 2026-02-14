@@ -877,21 +877,31 @@ export default function App() {
     });
   },[]);
 
-  // Move task to another project
-  const moveTaskToProject = useCallback((taskId, fromProjectId, toProjectId) => {
-    if (fromProjectId === toProjectId) return;
-    setProjects(ps => ps.map(p => {
-      if (p.id === fromProjectId) {
-        return { ...p, tasks: p.tasks.filter(t => t.id !== taskId) };
-      }
-      if (p.id === toProjectId) {
-        const taskToMove = ps.find(proj => proj.id === fromProjectId)?.tasks.find(t => t.id === taskId);
-        if (taskToMove) {
-          return { ...p, tasks: [...p.tasks, { ...taskToMove, projectId: toProjectId, dependencies: [] }] };
+  // Move task(s) to another project - 複数タスク対応
+  const moveTaskToProject = useCallback((taskIds, toProjectId) => {
+    const idsToMove = Array.isArray(taskIds) ? taskIds : [taskIds];
+    setProjects(ps => {
+      // 移動対象のタスクを収集
+      const tasksToMove = [];
+      ps.forEach(p => {
+        p.tasks.forEach(t => {
+          if (idsToMove.includes(t.id) && p.id !== toProjectId) {
+            tasksToMove.push({ ...t, projectId: toProjectId, dependencies: [] });
+          }
+        });
+      });
+      if (tasksToMove.length === 0) return ps;
+
+      return ps.map(p => {
+        // 移動元から削除
+        const filtered = p.tasks.filter(t => !idsToMove.includes(t.id) || p.id === toProjectId);
+        // 移動先に追加
+        if (p.id === toProjectId) {
+          return { ...p, tasks: [...filtered, ...tasksToMove] };
         }
-      }
-      return p;
-    }));
+        return { ...p, tasks: filtered };
+      });
+    });
   }, []);
 
   // Delete project
@@ -1185,8 +1195,8 @@ export default function App() {
     let lastY=drag.startY;
     const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){return{...t,start:addDays(t.start,ds),end:addDays(t.end,ds)}}return t})})))};
     const onU=e=>{
-      // Y軸方向の移動で別のプロジェクトに移動（単一タスクのみ）
-      if(drag.type==="move"&&drag.active.size===1&&ganttRef.current&&bodyRef.current){
+      // Y軸方向の移動で別のプロジェクトに移動（複数タスク対応）
+      if(drag.type==="move"&&drag.active.size>=1&&ganttRef.current&&bodyRef.current){
         const ganttRect=ganttRef.current.getBoundingClientRect();
         const headerHeight=zoomLevel==="day"?60:72;
         const relY=lastY-ganttRect.top+ganttRef.current.scrollTop-headerHeight;
@@ -1200,10 +1210,11 @@ export default function App() {
           }
           curY+=h;
         }
-        const taskId=Array.from(drag.active)[0];
-        const origProjId=drag.od[taskId]?.projectId;
-        if(targetProjId&&origProjId&&targetProjId!==origProjId){
-          moveTaskToProject(taskId,origProjId,targetProjId);
+        const taskIds=Array.from(drag.active);
+        // 移動元とは別のプロジェクトに移動する場合
+        const hasMovement=taskIds.some(tid=>drag.od[tid]?.projectId&&drag.od[tid].projectId!==targetProjId);
+        if(targetProjId&&hasMovement){
+          moveTaskToProject(taskIds,targetProjId);
         }
       }
       setDrag(null);setDragShift(0);setDragPos(null);
