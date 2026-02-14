@@ -978,9 +978,10 @@ export default function App() {
     setOpenTid(newId);
   },[view,rowList,DW,dateRange]);
 
-  useEffect(()=>{if(!mActive||!marquee)return;let lastHit=new Set();const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}lastHit=hit;setSelIds(hit)};const onU=()=>{
+  useEffect(()=>{if(!mActive||!marquee)return;let lastHit=new Set();let lastCx=marquee.cx,lastCy=marquee.cy;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;lastCx=x;lastCy=y;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}lastHit=hit;setSelIds(hit)};const onU=()=>{
     // ドラッグ終了時：選択タスクがなく、一定の幅があれば新規タスク作成
-    const mx1=Math.min(marquee.sx,marquee.cx),my1=Math.min(marquee.sy,marquee.cy),mx2=Math.max(marquee.sx,marquee.cx),my2=Math.max(marquee.sy,marquee.cy);
+    // lastCx/lastCyを使用して最新の座標を確実に取得
+    const mx1=Math.min(marquee.sx,lastCx),my1=Math.min(marquee.sy,lastCy),mx2=Math.max(marquee.sx,lastCx),my2=Math.max(marquee.sy,lastCy);
     const dragW=mx2-mx1;
     if(lastHit.size===0&&dragW>10){
       createTaskFromDrag(mx1,my1,mx2,my2,marquee.scrollX||0,marquee.scrollY||0);
@@ -1191,7 +1192,7 @@ export default function App() {
         {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:(
           <React.Fragment>
             <div style={ST.side}>
-              <div style={{padding:"12px 16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
+              <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:54,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
                   if(row.type==="project"){const p=row.project;const isDragOver=dragOverProjId===p.id&&dragProjId!==p.id;return(<div key={"p-"+p.id} draggable onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
@@ -1208,7 +1209,7 @@ export default function App() {
             </div>
 
             <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden",background:"#f8f7f4"}}>
-              <div ref={headerRef} style={{flexShrink:0,overflow:"hidden"}}>
+              <div ref={headerRef} style={{flexShrink:0,overflow:"hidden",height:54}}>
                 <div style={{display:"flex"}}>{headerRows.top.map((g,i)=><div key={i} style={{fontSize:11,fontWeight:600,color:"#6b7280",padding:"6px 0 2px 8px",borderBottom:"1px solid #e5e7eb",background:"#fff",width:g.width,minWidth:g.width,overflow:"hidden",whiteSpace:"nowrap"}}>{g.width>40?g.label:""}</div>)}</div>
                 <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"6px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>{zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>:<span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{col.width>20?col.label:""}</span>}</div>))}</div>
               </div>
