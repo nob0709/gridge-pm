@@ -951,8 +951,9 @@ export default function App() {
   // ドラッグで新規タスク作成
   const createTaskFromDrag = useCallback((mx1,my1,mx2,my2,scrollX,scrollY)=>{
     if(view==="timeline")return;
-    // スクロール込みの座標に変換
-    const x1=mx1+scrollX,x2=mx2+scrollX,y=my1+scrollY;
+    // bodyRect.leftは既に水平スクロールを反映しているのでscrollXは不要
+    // 垂直方向はscrollYを追加（handleBodyDblClickと同じ）
+    const x1=mx1,x2=mx2,y=my1+scrollY;
     // プロジェクト行を特定
     let rowY=0,targetProj=null;
     for(const row of rowList){
