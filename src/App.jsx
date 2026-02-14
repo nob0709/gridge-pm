@@ -1565,8 +1565,110 @@ export default function App() {
 
   const rowList = useMemo(()=>{
     const sortByStart=(a,b)=>new Date(a.start)-new Date(b.start);
-    if(view==="timeline"){const rows=[];teamMembers.forEach(m=>{const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push({...t,projName:p.name})}));if(mt.length>0){mt.sort(sortByStart);rows.push({type:"member",member:m,count:mt.length});mt.forEach(t=>rows.push({type:"task",task:t,project:{name:t.projName}}))}});return rows}
-    const r=[];filtered.forEach(p=>{r.push({type:"project",project:p});if(!p.collapsed)[...p.tasks].sort(sortByStart).forEach(t=>r.push({type:"task",task:t,project:p}))});return r;
+    // 依存チェーンでタスクをグループ化してソート
+    const sortByDependencyChain = (tasks) => {
+      if(tasks.length === 0) return tasks;
+      // 依存グラフを構築（双方向）
+      const graph = {};
+      const taskMap = {};
+      tasks.forEach(t => {
+        taskMap[t.id] = t;
+        graph[t.id] = new Set();
+      });
+      tasks.forEach(t => {
+        if(t.dependencies) {
+          t.dependencies.forEach(depId => {
+            if(taskMap[depId]) {
+              graph[t.id].add(depId);
+              graph[depId].add(t.id);
+            }
+          });
+        }
+      });
+      // 連結成分を見つける（DFS）
+      const visited = new Set();
+      const components = [];
+      const findComponent = (startId) => {
+        const comp = [];
+        const stack = [startId];
+        while(stack.length > 0) {
+          const id = stack.pop();
+          if(visited.has(id)) continue;
+          visited.add(id);
+          comp.push(taskMap[id]);
+          graph[id].forEach(neighborId => {
+            if(!visited.has(neighborId)) stack.push(neighborId);
+          });
+        }
+        return comp;
+      };
+      tasks.forEach(t => {
+        if(!visited.has(t.id)) {
+          const comp = findComponent(t.id);
+          if(comp.length > 0) components.push(comp);
+        }
+      });
+      // 各コンポーネント内でトポロジカルソート（依存元が先、依存先が後）
+      const topoSort = (comp) => {
+        if(comp.length <= 1) return comp;
+        const ids = new Set(comp.map(t => t.id));
+        const inDegree = {};
+        const children = {};
+        comp.forEach(t => {
+          inDegree[t.id] = 0;
+          children[t.id] = [];
+        });
+        comp.forEach(t => {
+          if(t.dependencies) {
+            t.dependencies.forEach(depId => {
+              if(ids.has(depId)) {
+                inDegree[t.id]++;
+                children[depId].push(t.id);
+              }
+            });
+          }
+        });
+        // 入次数0のタスクから開始（開始日順）
+        const result = [];
+        const queue = comp.filter(t => inDegree[t.id] === 0).sort(sortByStart);
+        const added = new Set();
+        while(queue.length > 0) {
+          const t = queue.shift();
+          if(added.has(t.id)) continue;
+          added.add(t.id);
+          result.push(t);
+          children[t.id].forEach(childId => {
+            inDegree[childId]--;
+            if(inDegree[childId] === 0) {
+              const childTask = taskMap[childId];
+              // 挿入位置を開始日でソート
+              let inserted = false;
+              for(let i = 0; i < queue.length; i++) {
+                if(new Date(childTask.start) < new Date(queue[i].start)) {
+                  queue.splice(i, 0, childTask);
+                  inserted = true;
+                  break;
+                }
+              }
+              if(!inserted) queue.push(childTask);
+            }
+          });
+        }
+        // 循環依存などで追加されなかったタスクを末尾に追加
+        comp.forEach(t => {
+          if(!added.has(t.id)) result.push(t);
+        });
+        return result;
+      };
+      // 各コンポーネントをソートし、コンポーネント間は最小開始日でソート
+      const sortedComponents = components.map(comp => ({
+        tasks: topoSort(comp),
+        minStart: Math.min(...comp.map(t => new Date(t.start).getTime()))
+      })).sort((a, b) => a.minStart - b.minStart);
+      return sortedComponents.flatMap(c => c.tasks);
+    };
+    if(view==="timeline"){const rows=[];teamMembers.forEach(m=>{const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push({...t,projName:p.name})}));if(mt.length>0){const sorted=sortByDependencyChain(mt);rows.push({type:"member",member:m,count:mt.length});sorted.forEach(t=>rows.push({type:"task",task:t,project:{name:t.projName}}))}});return rows}
+    const r=[];filtered.forEach(p=>{r.push({type:"project",project:p});if(!p.collapsed){const sorted=sortByDependencyChain([...p.tasks]);sorted.forEach(t=>r.push({type:"task",task:t,project:p}))}});return r;
   },[filtered,view,teamMembers]);
 
   // Toggle selection with Shift range support
