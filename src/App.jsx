@@ -211,7 +211,7 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
 }
 
 // Calendar - 週/月表示、月曜始まり、ドラッグ移動対応
-function CalView({ projects, setProjects, today, onOpen, members }) {
+function CalView({ projects, setProjects, today, onOpen, members, filterA, filterS }) {
   const [calMode, setCalMode] = useState("month"); // "day" or "week" or "month"
   const [offset, setOffset] = useState(0); // 日/週/月のオフセット
   const [drag, setDrag] = useState(null);
@@ -219,9 +219,17 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
 
   const tasks = useMemo(() => {
     const arr = [];
-    projects.forEach(p => p.tasks.forEach(t => arr.push({ ...t, projectName: p.name, projectId: p.id })));
+    projects
+      .filter(p => !filterS || p.status === filterS)
+      .forEach(p => p.tasks
+        .filter(t => {
+          if (!filterA) return true;
+          if (filterA === "unassigned") return !t.assignee;
+          return t.assignee === filterA;
+        })
+        .forEach(t => arr.push({ ...t, projectName: p.name, projectId: p.id })));
     return arr;
-  }, [projects]);
+  }, [projects, filterA, filterS]);
 
   const getMonday = (d) => {
     const date = new Date(d);
@@ -2126,7 +2134,7 @@ export default function App() {
       </div>}
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-        {view==="calendar"?<CalView projects={projects} setProjects={setProjects} today={today} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:(
+        {view==="calendar"?<CalView projects={projects} setProjects={setProjects} today={today} onOpen={t=>setOpenTid(t.id)} members={teamMembers} filterA={filterA} filterS={filterS}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:(
           <React.Fragment>
             <div style={ST.side}>
               <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
