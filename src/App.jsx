@@ -571,6 +571,11 @@ export default function App() {
   const DW = dayWidth;
   const zoomLevel = getZL(DW);
 
+  // 前回保存時の状態を追跡（削除検知用）
+  const prevProjectIdsRef = useRef(new Set());
+  const prevTaskIdsRef = useRef(new Set());
+  const dbLoadedRef = useRef(false);
+
   // Load data from Supabase
   const loadFromDB = useCallback(async () => {
     setLoading(true);
@@ -586,11 +591,16 @@ export default function App() {
         .select('*');
       if (tError) throw tError;
 
-      if (projectsData.length === 0) {
-        // DB is empty, use demo data
-        setProjects(genProjects());
+      if (projectsData.length === 0 && tasksData.length === 0) {
+        // DBが本当に空の場合のみデモデータ（初回セットアップ）
+        console.log('DB is empty, initializing with demo data');
+        const demoData = genProjects();
+        setProjects(demoData);
+        // デモデータのIDを記録
+        prevProjectIdsRef.current = new Set(demoData.map(p => p.id));
+        prevTaskIdsRef.current = new Set(demoData.flatMap(p => p.tasks.map(t => t.id)));
       } else {
-        // Map DB data to app format
+        // DBからデータをマッピング
         const mapped = projectsData.map(p => ({
           id: p.id,
           name: p.name,
@@ -616,24 +626,51 @@ export default function App() {
             }))
         }));
         setProjects(mapped);
+        // 現在のIDを記録
+        prevProjectIdsRef.current = new Set(mapped.map(p => p.id));
+        prevTaskIdsRef.current = new Set(mapped.flatMap(p => p.tasks.map(t => t.id)));
       }
+      dbLoadedRef.current = true;
     } catch (err) {
       console.error('Load error:', err);
-      setProjects(genProjects());
+      // エラー時は既存のローカルデータを維持（デモデータで上書きしない）
+      // 初回ロードでエラーの場合のみデモデータを表示
+      if (!dbLoadedRef.current && projects.length === 0) {
+        console.log('Initial load failed, showing demo data (not saved)');
+        setProjects(genProjects());
+      }
     }
     setLoading(false);
   }, []);
 
-  // Save data to Supabase
+  // Upsert方式でデータを保存
   const saveToDB = useCallback(async () => {
+    if (!dbLoadedRef.current) return; // DBロード完了前は保存しない
     setSaving(true);
     try {
-      // Delete existing data
-      await supabase.from('tasks').delete().neq('id', '');
-      await supabase.from('projects').delete().neq('id', 0);
+      // 現在のIDセットを取得
+      const currentProjectIds = new Set(projects.map(p => p.id));
+      const currentTaskIds = new Set(projects.flatMap(p => p.tasks.map(t => t.id)));
 
-      // Insert projects
-      const projectsToInsert = projects.map((p, i) => ({
+      // 削除されたプロジェクトを検出
+      const deletedProjectIds = [...prevProjectIdsRef.current].filter(id => !currentProjectIds.has(id));
+      // 削除されたタスクを検出
+      const deletedTaskIds = [...prevTaskIdsRef.current].filter(id => !currentTaskIds.has(id));
+
+      // 削除されたタスクをDBから削除
+      if (deletedTaskIds.length > 0) {
+        const { error } = await supabase.from('tasks').delete().in('id', deletedTaskIds);
+        if (error) console.error('Task delete error:', error);
+      }
+
+      // 削除されたプロジェクトをDBから削除
+      if (deletedProjectIds.length > 0) {
+        const { error } = await supabase.from('projects').delete().in('id', deletedProjectIds);
+        if (error) console.error('Project delete error:', error);
+      }
+
+      // プロジェクトをupsert
+      const projectsToUpsert = projects.map((p, i) => ({
         id: p.id,
         name: p.name,
         client: p.client || '',
@@ -641,11 +678,15 @@ export default function App() {
         collapsed: p.collapsed || false,
         sort_order: i,
       }));
-      const { error: pError } = await supabase.from('projects').insert(projectsToInsert);
-      if (pError) throw pError;
+      if (projectsToUpsert.length > 0) {
+        const { error: pError } = await supabase
+          .from('projects')
+          .upsert(projectsToUpsert, { onConflict: 'id' });
+        if (pError) throw pError;
+      }
 
-      // Insert tasks
-      const tasksToInsert = projects.flatMap(p =>
+      // タスクをupsert
+      const tasksToUpsert = projects.flatMap(p =>
         p.tasks.map(t => ({
           id: t.id,
           project_id: p.id,
@@ -662,12 +703,20 @@ export default function App() {
           task_type: t.type,
         }))
       );
-      if (tasksToInsert.length > 0) {
-        const { error: tError } = await supabase.from('tasks').insert(tasksToInsert);
+      if (tasksToUpsert.length > 0) {
+        const { error: tError } = await supabase
+          .from('tasks')
+          .upsert(tasksToUpsert, { onConflict: 'id' });
         if (tError) throw tError;
       }
+
+      // 保存成功したら現在のIDを記録
+      prevProjectIdsRef.current = currentProjectIds;
+      prevTaskIdsRef.current = currentTaskIds;
+
     } catch (err) {
       console.error('Save error:', err);
+      // 保存エラー時はローカルデータは維持（ユーザーの作業を失わない）
     }
     setSaving(false);
   }, [projects]);
@@ -684,14 +733,14 @@ export default function App() {
       isFirstRender.current = false;
       return;
     }
-    if (loading || projects.length === 0) return;
+    if (loading || !dbLoadedRef.current) return; // DBロード完了前は保存しない
 
     const timer = setTimeout(() => {
       saveToDB();
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [projects]);
+  }, [projects, saveToDB]);
 
   const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name,projectTasks:p.tasks};return null},[openTid,projects]);
 
