@@ -1410,56 +1410,101 @@ export default function App() {
 
   // メンバーごとの週別ワークロード計算（メンバービュー用）
   const memberWorkloads = useMemo(()=>{
-    if(view!=="timeline"||zoomLevel==="day")return{};
+    if(view!=="timeline")return{};
     const result={};
-    TEAM.forEach(m=>{
-      result[m.id]={};
-      const weeklyCapacity=m.hpw; // 週あたりのキャパシティ
-      headerRows.bot.forEach(col=>{
-        let periodStart,periodEnd;
-        if(zoomLevel==="week"){
-          periodStart=new Date(col.key);
-          periodEnd=addDays(periodStart,4);
-        }else{
-          const parts=col.key.split("-");
-          periodStart=new Date(parseInt(parts[0]),parseInt(parts[1]),1);
-          periodEnd=new Date(parseInt(parts[0]),parseInt(parts[1])+1,0);
-        }
 
-        const workDaysInPeriod=zoomLevel==="week"?5:Math.round((periodEnd-periodStart)/(864e5*7)*5);
-        const periodCapacity=zoomLevel==="week"?weeklyCapacity:Math.round(weeklyCapacity*workDaysInPeriod/5);
-
-        let workload=0;
-        projects.forEach(p=>p.tasks.forEach(t=>{
-          if(t.assignee===m.id&&t.type!=="milestone"){
-            const s=new Date(t.start),e=new Date(t.end);
-            if(s<=periodEnd&&e>=periodStart){
-              const os=s>periodStart?s:periodStart,oe=e<periodEnd?e:periodEnd;
-              let dInPeriod=0;
-              const cur=new Date(os);
-              while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
-              const totalDays=diffD(t.start,t.end)+1;
-              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
-              workload+=hours;
-            }
-          }
-        }));
-
-        const util=periodCapacity>0?Math.round(workload/periodCapacity*100):0;
-        result[m.id][col.key]={workload:Math.round(workload*10)/10,capacity:periodCapacity,util,left:0,width:col.width};
-      });
-
-      // 列の位置を計算
+    // 日表示の場合は週単位でグループ化
+    if(zoomLevel==="day"){
+      // 週ごとにまとめる
+      const weekGroups={};
       let left=0;
       headerRows.bot.forEach(col=>{
-        if(result[m.id][col.key]){
-          result[m.id][col.key].left=left;
+        const d=dateRange[headerRows.bot.indexOf(col)];
+        if(!d)return;
+        const mon=getMon(d);
+        const wk=mon.toDateString();
+        if(!weekGroups[wk]){
+          weekGroups[wk]={start:mon,end:addDays(mon,4),left,width:0,days:[]};
         }
-        left+=col.width;
+        weekGroups[wk].width+=DW;
+        weekGroups[wk].days.push(d);
+        left+=DW;
       });
-    });
+
+      TEAM.forEach(m=>{
+        result[m.id]={};
+        const weeklyCapacity=m.hpw;
+        Object.entries(weekGroups).forEach(([wk,g])=>{
+          let workload=0;
+          projects.forEach(p=>p.tasks.forEach(t=>{
+            if(t.assignee===m.id&&t.type!=="milestone"){
+              const s=new Date(t.start),e=new Date(t.end);
+              if(s<=g.end&&e>=g.start){
+                const os=s>g.start?s:g.start,oe=e<g.end?e:g.end;
+                let dInPeriod=0;
+                const cur=new Date(os);
+                while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+                const totalDays=diffD(t.start,t.end)+1;
+                const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+                workload+=hours;
+              }
+            }
+          }));
+          const util=weeklyCapacity>0?Math.round(workload/weeklyCapacity*100):0;
+          result[m.id][wk]={workload:Math.round(workload*10)/10,capacity:weeklyCapacity,util,left:g.left,width:g.width};
+        });
+      });
+    }else{
+      // 週/月表示
+      TEAM.forEach(m=>{
+        result[m.id]={};
+        const weeklyCapacity=m.hpw;
+        headerRows.bot.forEach(col=>{
+          let periodStart,periodEnd;
+          if(zoomLevel==="week"){
+            periodStart=new Date(col.key);
+            periodEnd=addDays(periodStart,4);
+          }else{
+            const parts=col.key.split("-");
+            periodStart=new Date(parseInt(parts[0]),parseInt(parts[1]),1);
+            periodEnd=new Date(parseInt(parts[0]),parseInt(parts[1])+1,0);
+          }
+
+          const workDaysInPeriod=zoomLevel==="week"?5:Math.round((periodEnd-periodStart)/(864e5*7)*5);
+          const periodCapacity=zoomLevel==="week"?weeklyCapacity:Math.round(weeklyCapacity*workDaysInPeriod/5);
+
+          let workload=0;
+          projects.forEach(p=>p.tasks.forEach(t=>{
+            if(t.assignee===m.id&&t.type!=="milestone"){
+              const s=new Date(t.start),e=new Date(t.end);
+              if(s<=periodEnd&&e>=periodStart){
+                const os=s>periodStart?s:periodStart,oe=e<periodEnd?e:periodEnd;
+                let dInPeriod=0;
+                const cur=new Date(os);
+                while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+                const totalDays=diffD(t.start,t.end)+1;
+                const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+                workload+=hours;
+              }
+            }
+          }));
+
+          const util=periodCapacity>0?Math.round(workload/periodCapacity*100):0;
+          result[m.id][col.key]={workload:Math.round(workload*10)/10,capacity:periodCapacity,util,left:0,width:col.width};
+        });
+
+        // 列の位置を計算
+        let left=0;
+        headerRows.bot.forEach(col=>{
+          if(result[m.id][col.key]){
+            result[m.id][col.key].left=left;
+          }
+          left+=col.width;
+        });
+      });
+    }
     return result;
-  },[view,zoomLevel,headerRows.bot,projects]);
+  },[view,zoomLevel,headerRows.bot,projects,dateRange,DW]);
 
   useEffect(()=>{const pos={};let rowY=0;rowList.forEach(row=>{if(row.type==="project"||row.type==="member"){rowY+=44;return}const t=row.task;const left=getPos(t.start),right=getPos(t.end)+DW;if(t.type==="milestone")pos[t.id]={left,right:left+24,top:rowY+6,bottom:rowY+30};else pos[t.id]={left,right,top:rowY+7,bottom:rowY+29};rowY+=36});barRects.current=pos},[rowList,getPos,DW]);
 
@@ -1642,7 +1687,7 @@ export default function App() {
                       const mw=memberWorkloads[m.id]||{};
                       const maxUtil=Math.max(100,...Object.values(mw).map(w=>w.util||0));
                       return(<div key={"gr-"+m.id} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa",alignItems:"flex-end"}}>
-                        {zoomLevel!=="day"&&Object.entries(mw).map(([key,w])=>{
+                        {Object.entries(mw).map(([key,w])=>{
                           const barHeight=maxUtil>0?Math.max(2,(w.util/maxUtil)*32):0;
                           const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
                           return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:4,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
