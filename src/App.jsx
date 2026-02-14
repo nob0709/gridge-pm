@@ -1820,7 +1820,7 @@ export default function App() {
     const depTasks = depTasksRef.current;
     const depOriginal = depOriginalRef.current;
     let lastY=drag.startY;
-    const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds!==0){const depO=depOriginal[t.id];if(depO)return{...t,start:addDays(depO.start,ds),end:addDays(depO.end,ds)}}return t})})))};
+    const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)){const depO=depOriginal[t.id];if(depO)return{...t,start:addDays(depO.start,ds),end:addDays(depO.end,ds)}}return t})})))};
     const onU=e=>{
       // Y軸方向の移動で別のプロジェクトに移動（複数タスク対応）
       // 最低10px以上のY移動があった場合のみプロジェクト移動を判定
@@ -1956,10 +1956,14 @@ export default function App() {
   };window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee,createTaskFromDrag]);
 
   // 依存関係ドラッグ
+  const depDragRef = useRef(null);
+  useEffect(()=>{depDragRef.current=depDrag},[depDrag]);
   useEffect(()=>{if(!depDrag)return;
     const onM=e=>setDepDrag(prev=>prev?{...prev,mouseX:e.clientX,mouseY:e.clientY}:null);
     const onU=e=>{
       // barRectsを使ってドロップ先のタスクを探す
+      const currentDepDrag = depDragRef.current;
+      if(!currentDepDrag)return;
       const body=bodyRef.current;const gantt=ganttRef.current;
       if(body&&gantt){
         const bodyRect=body.getBoundingClientRect();
@@ -1970,23 +1974,26 @@ export default function App() {
           const br=rects[tid];
           if(mx>=br.left&&mx<=br.right&&my>=br.top&&my<=br.bottom){
             // このタスクにドロップ
-            if(tid!==depDrag.fromTaskId){
+            if(tid!==currentDepDrag.fromTaskId){
               // 同じプロジェクト内か確認
-              let sameProject=false;
-              projects.forEach(p=>{
-                const hasFrom=p.tasks.some(t=>t.id===depDrag.fromTaskId);
-                const hasTo=p.tasks.some(t=>t.id===tid);
-                if(hasFrom&&hasTo)sameProject=true;
+              setProjects(ps=>{
+                let sameProject=false;
+                ps.forEach(p=>{
+                  const hasFrom=p.tasks.some(t=>t.id===currentDepDrag.fromTaskId);
+                  const hasTo=p.tasks.some(t=>t.id===tid);
+                  if(hasFrom&&hasTo)sameProject=true;
+                });
+                if(sameProject){
+                  return ps.map(p=>({...p,tasks:p.tasks.map(t=>{
+                    if(t.id===tid){
+                      const deps=t.dependencies||[];
+                      if(!deps.includes(currentDepDrag.fromTaskId))return{...t,dependencies:[...deps,currentDepDrag.fromTaskId]};
+                    }
+                    return t;
+                  })}));
+                }
+                return ps;
               });
-              if(sameProject){
-                setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>{
-                  if(t.id===tid){
-                    const deps=t.dependencies||[];
-                    if(!deps.includes(depDrag.fromTaskId))return{...t,dependencies:[...deps,depDrag.fromTaskId]};
-                  }
-                  return t;
-                })})));
-              }
             }
             break;
           }
@@ -1996,7 +2003,7 @@ export default function App() {
     };
     window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);
     return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)};
-  },[depDrag,projects]);
+  },[!!depDrag]);
 
   const initialScrollRef=useRef(false);
   useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
