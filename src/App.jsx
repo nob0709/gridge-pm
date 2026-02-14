@@ -1702,10 +1702,11 @@ export default function App() {
     const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){return{...t,start:addDays(t.start,ds),end:addDays(t.end,ds)}}return t})})))};
     const onU=e=>{
       // Y軸方向の移動で別のプロジェクトに移動（複数タスク対応）
-      if(drag.type==="move"&&drag.active.size>=1&&ganttRef.current&&bodyRef.current){
-        const ganttRect=ganttRef.current.getBoundingClientRect();
-        const headerHeight=zoomLevel==="day"?60:72;
-        const relY=lastY-ganttRect.top+ganttRef.current.scrollTop-headerHeight;
+      // 最低10px以上のY移動があった場合のみプロジェクト移動を判定
+      const movedY = Math.abs(lastY - drag.startY);
+      if(drag.type==="move"&&drag.active.size>=1&&movedY>=10&&ganttRef.current&&bodyRef.current){
+        const bodyRect=bodyRef.current.getBoundingClientRect();
+        const relY=lastY-bodyRect.top+ganttRef.current.scrollTop;
         let curY=0;let targetProjId=null;
         for(const row of rowList){
           const h=row.type==="project"||row.type==="member"?44:36;
@@ -2234,7 +2235,7 @@ export default function App() {
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
                   if(row.type==="project"){const p=row.project;const isDragOver=(dragOverProjId===p.id&&dragProjId!==p.id)||(dragTaskId&&dragOverProjId===p.id&&dragTaskFromProjId!==p.id);const isEditing=editingProjectId===p.id;return(<div key={"p-"+p.id} draggable={!isEditing} onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null);if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} onDoubleClick={()=>setEditingProjectId(p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>{isEditing?<input autoFocus value={p.name} onChange={e=>setProjects(ps=>ps.map(x=>x.id===p.id?{...x,name:e.target.value}:x))} onBlur={()=>setEditingProjectId(null)} onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingProjectId(null)}} onClick={e=>e.stopPropagation()} style={{flex:1,padding:"2px 6px",fontSize:13,fontWeight:600,border:"1px solid #6366f1",borderRadius:4,outline:"none",background:"#fff"}}/>:<div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div>}<span style={{fontSize:11,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
-                  if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:11,color:"#6b7280"}}>{row.count}</span></div>)}
+                  if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8,position:"sticky",top:0,zIndex:3}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:11,color:"#6b7280"}}>{row.count}</span></div>)}
                   const t=row.task;const m=teamMembers.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);const pName=row.project?.name||"";const isDraggingTask=dragTaskId===t.id;
                   return(<div key={"t-"+t.id} draggable onDragStart={e=>{e.stopPropagation();setDragTaskId(t.id);setDragTaskFromProjId(row.project?.id)}} onDragEnd={()=>{if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null);setDragOverProjId(null)}} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{}),opacity:isDraggingTask?0.5:1,cursor:"grab"}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                     {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
@@ -2286,7 +2287,7 @@ export default function App() {
                       const m=row.member;
                       const mw=memberWorkloads[m.id]||{};
                       const maxUtil=Math.max(100,...Object.values(mw).map(w=>w.util||0));
-                      return(<div key={"gr-"+m.id} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa",alignItems:"flex-end"}}>
+                      return(<div key={"gr-"+m.id} style={{display:"flex",position:"sticky",top:0,height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa",alignItems:"flex-end",zIndex:3}}>
                         {Object.entries(mw).map(([key,w])=>{
                           const barHeight=maxUtil>0?Math.max(2,(w.util/maxUtil)*32):0;
                           const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
