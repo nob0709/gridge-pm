@@ -644,10 +644,18 @@ export default function App() {
     setLoading(false);
   }, []);
 
+  // 保存エラー状態
+  const [saveError, setSaveError] = useState(null);
+
   // Upsert方式でデータを保存
   const saveToDB = useCallback(async () => {
-    if (!dbLoadedRef.current) return; // DBロード完了前は保存しない
+    if (!dbLoadedRef.current) {
+      console.log('Skip save: DB not loaded yet');
+      return;
+    }
+    console.log('Saving to DB...', { projectCount: projects.length, taskCount: projects.reduce((a,p)=>a+p.tasks.length,0) });
     setSaving(true);
+    setSaveError(null);
     try {
       // 現在のIDセットを取得
       const currentProjectIds = new Set(projects.map(p => p.id));
@@ -660,12 +668,14 @@ export default function App() {
 
       // 削除されたタスクをDBから削除
       if (deletedTaskIds.length > 0) {
+        console.log('Deleting tasks:', deletedTaskIds);
         const { error } = await supabase.from('tasks').delete().in('id', deletedTaskIds);
         if (error) console.error('Task delete error:', error);
       }
 
       // 削除されたプロジェクトをDBから削除
       if (deletedProjectIds.length > 0) {
+        console.log('Deleting projects:', deletedProjectIds);
         const { error } = await supabase.from('projects').delete().in('id', deletedProjectIds);
         if (error) console.error('Project delete error:', error);
       }
@@ -680,44 +690,60 @@ export default function App() {
         sort_order: i,
       }));
       if (projectsToUpsert.length > 0) {
+        console.log('Upserting projects:', projectsToUpsert.length);
         const { error: pError } = await supabase
           .from('projects')
           .upsert(projectsToUpsert, { onConflict: 'id' });
-        if (pError) throw pError;
+        if (pError) {
+          console.error('Project upsert error:', pError);
+          throw pError;
+        }
       }
 
-      // タスクをupsert
+      // タスクをupsert（dependenciesは存在しない場合に備えて除外可能に）
       const tasksToUpsert = projects.flatMap(p =>
-        p.tasks.map(t => ({
-          id: t.id,
-          project_id: p.id,
-          name: t.name || '',
-          phase: t.phase || 'wire',
-          assignee: t.assignee,
-          start_date: fmtISO(t.start),
-          end_date: fmtISO(t.end),
-          done: t.done || false,
-          task_status: t.taskStatus || 'todo',
-          description: t.desc || '',
-          comments: t.comments || [],
-          estimated_hours: t.estimatedHours,
-          task_type: t.type,
-          dependencies: t.dependencies || [],
-        }))
+        p.tasks.map(t => {
+          const task = {
+            id: t.id,
+            project_id: p.id,
+            name: t.name || '',
+            phase: t.phase || 'wire',
+            assignee: t.assignee,
+            start_date: fmtISO(t.start),
+            end_date: fmtISO(t.end),
+            done: t.done || false,
+            task_status: t.taskStatus || 'todo',
+            description: t.desc || '',
+            comments: t.comments || [],
+            estimated_hours: t.estimatedHours,
+            task_type: t.type,
+          };
+          // dependenciesカラムがある場合のみ追加
+          if (t.dependencies && t.dependencies.length > 0) {
+            task.dependencies = t.dependencies;
+          }
+          return task;
+        })
       );
       if (tasksToUpsert.length > 0) {
+        console.log('Upserting tasks:', tasksToUpsert.length);
         const { error: tError } = await supabase
           .from('tasks')
           .upsert(tasksToUpsert, { onConflict: 'id' });
-        if (tError) throw tError;
+        if (tError) {
+          console.error('Task upsert error:', tError);
+          throw tError;
+        }
       }
 
       // 保存成功したら現在のIDを記録
       prevProjectIdsRef.current = currentProjectIds;
       prevTaskIdsRef.current = currentTaskIds;
+      console.log('Save completed successfully');
 
     } catch (err) {
       console.error('Save error:', err);
+      setSaveError(err.message || 'Save failed');
       // 保存エラー時はローカルデータは維持（ユーザーの作業を失わない）
     }
     setSaving(false);
@@ -1223,6 +1249,8 @@ export default function App() {
             </div>}
           </div>
           {saving&&<span style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4}}>保存中...</span>}
+          {saveError&&<span style={{fontSize:11,color:"#ef4444",display:"flex",alignItems:"center",gap:4}} title={saveError}>⚠️ 保存エラー</span>}
+          {!saving&&!saveError&&dbLoadedRef.current&&<span style={{fontSize:11,color:"#10b981",display:"flex",alignItems:"center",gap:4}}>✓ 保存済み</span>}
         </div>
       </div>
 
