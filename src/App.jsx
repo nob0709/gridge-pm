@@ -95,10 +95,10 @@ const ST = {
   sbar:on=>({display:"flex",alignItems:"center",gap:12,padding:"8px 20px",background:on?"rgba(99,102,241,.06)":"#fff",borderBottom:"1px solid "+(on?"rgba(99,102,241,.3)":"#e5e7eb"),fontSize:12,color:"#6366f1",flexShrink:0,minHeight:38}),
   sbtn:{padding:"3px 10px",borderRadius:4,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid rgba(99,102,241,.4)",background:"transparent",color:"#6366f1"},
   side:{width:280,minWidth:280,borderRight:"1px solid #e5e7eb",display:"flex",flexDirection:"column",background:"#fff",zIndex:10},
-  prow:isH=>({display:"flex",alignItems:"center",padding:"0 10px",height:isH?44:36,cursor:"pointer",gap:6,fontSize:isH?13:12,userSelect:"none",fontWeight:isH?600:400,background:isH?"#f9fafb":"transparent",borderBottom:isH?"1px solid #e5e7eb":"none",color:isH?"#1f2937":"#4b5563"}),
+  prow:isH=>({display:"flex",alignItems:"center",padding:"0 10px",height:isH?44:36,cursor:"pointer",gap:6,fontSize:isH?13:13,userSelect:"none",fontWeight:isH?600:400,background:isH?"#f9fafb":"transparent",borderBottom:isH?"1px solid #e5e7eb":"none",color:isH?"#1f2937":"#4b5563"}),
   tog:open=>({width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#9ca3af",fontSize:10,transform:open?"rotate(90deg)":"none",flexShrink:0}),
   tav:c=>({width:22,height:22,borderRadius:"50%",fontSize:9,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#fff",background:c}),
-  bar:(l,w,c,sel,drg)=>({position:"absolute",height:22,borderRadius:5,cursor:"grab",display:"flex",alignItems:"center",padding:"0 6px",fontSize:10,fontWeight:500,color:"#fff",zIndex:sel?5:3,overflow:"visible",whiteSpace:"nowrap",userSelect:"none",left:l,width:Math.max(w,4),top:7,background:c,outline:sel?"2px solid #6366f1":"none",outlineOffset:sel?1:0,boxShadow:sel?"0 0 8px rgba(99,102,241,.3)":(drg?"0 4px 12px rgba(0,0,0,.15)":"0 1px 3px rgba(0,0,0,.1)"),opacity:drg?0.9:1}),
+  bar:(l,w,c,sel,drg)=>({position:"absolute",height:22,borderRadius:5,cursor:"grab",display:"flex",alignItems:"center",padding:"0 6px",fontSize:12,fontWeight:500,color:"#fff",zIndex:sel?5:3,overflow:"visible",whiteSpace:"nowrap",userSelect:"none",left:l,width:Math.max(w,4),top:7,background:c,outline:sel?"2px solid #6366f1":"none",outlineOffset:sel?1:0,boxShadow:sel?"0 0 8px rgba(99,102,241,.3)":(drg?"0 4px 12px rgba(0,0,0,.15)":"0 1px 3px rgba(0,0,0,.1)"),opacity:drg?0.9:1}),
   rh:side=>({position:"absolute",top:0,bottom:0,width:8,cursor:"ew-resize",[side==="l"?"left":"right"]:-2}),
   ms:l=>({position:"absolute",zIndex:3,cursor:"grab",display:"flex",alignItems:"center",gap:4,left:l,top:10}),
   md:(c,sel)=>({width:14,height:14,transform:"rotate(45deg)",borderRadius:2,border:"2px solid "+c,background:c+"30",boxShadow:sel?"0 0 0 3px rgba(99,102,241,.3)":"none"}),
@@ -2282,7 +2282,7 @@ export default function App() {
                           const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
                           return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:4,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
                             <div style={{width:"calc(100% - 4px)",height:barHeight,background:capColor,opacity:0.6,borderRadius:"2px 2px 0 0"}} title={`${w.workload}h / ${w.capacity}h (${w.util}%)`}/>
-                            {w.width>=50&&<span style={{fontSize:8,color:w.util>100?"#ef4444":w.util>80?"#f59e0b":"#6b7280",fontWeight:w.util>80?600:400}}>{w.workload}h</span>}
+                            {w.width>=50&&<span style={{fontSize:10,color:w.util>100?"#ef4444":w.util>80?"#f59e0b":"#6b7280",fontWeight:w.util>80?600:400}}>{w.workload}h</span>}
                           </div>);
                         })}
                       </div>);
@@ -2335,7 +2335,7 @@ export default function App() {
               <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:10,color:"#6b7280"}}>{m.role}</div></div></div>
                 <div style={{height:6,background:"#e5e7eb",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
                 <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#4b5563"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#6b7280",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>タスクなし</div>}</div>
               </div>
             ))}
@@ -2345,7 +2345,7 @@ export default function App() {
                 <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color,border:"2px dashed #fff",boxShadow:"0 0 0 2px "+m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:10,color:"#6b7280"}}>{m.role}</div></div></div>
                   <div style={{height:6,background:"#e5e7eb",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
                   <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#4b5563"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#6b7280",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>タスクなし</div>}</div>
                 </div>
               ))}
