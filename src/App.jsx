@@ -916,10 +916,10 @@ export default function App() {
     if(view==="timeline")return; // timeline view not supported yet
     const cont=bodyRef.current;if(!cont)return;
     const gantt=ganttRef.current;if(!gantt)return;
-    // bodyRefからの相対座標を計算（スクロール込み）
-    const ganttRect=gantt.getBoundingClientRect();
-    const x=e.clientX-ganttRect.left+gantt.scrollLeft;
-    const y=e.clientY-ganttRect.top+gantt.scrollTop;
+    // bodyRefの位置を基準に座標を計算
+    const bodyRect=cont.getBoundingClientRect();
+    const x=e.clientX-bodyRect.left;
+    const y=e.clientY-bodyRect.top+gantt.scrollTop;
     // Find which project row was clicked
     let rowY=0,targetProj=null,clickedRow=null;
     for(const row of rowList){
@@ -991,28 +991,44 @@ export default function App() {
   useEffect(()=>{if(!depDrag)return;
     const onM=e=>setDepDrag(prev=>prev?{...prev,mouseX:e.clientX,mouseY:e.clientY}:null);
     const onU=e=>{
-      // ドロップ先のタスクを探す
-      const el=document.elementFromPoint(e.clientX,e.clientY);
-      const bar=el?.closest("[data-bar]");
-      if(bar){
-        const toTaskId=bar.getAttribute("data-taskid");
-        const toProjectId=bar.getAttribute("data-projectid");
-        if(toTaskId&&toTaskId!==depDrag.fromTaskId&&toProjectId===depDrag.fromProjectId){
-          // 依存関係を追加（toTaskがfromTaskに依存）
-          setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>{
-            if(t.id===toTaskId){
-              const deps=t.dependencies||[];
-              if(!deps.includes(depDrag.fromTaskId))return{...t,dependencies:[...deps,depDrag.fromTaskId]};
+      // barRectsを使ってドロップ先のタスクを探す
+      const body=bodyRef.current;const gantt=ganttRef.current;
+      if(body&&gantt){
+        const bodyRect=body.getBoundingClientRect();
+        const mx=e.clientX-bodyRect.left;
+        const my=e.clientY-bodyRect.top+gantt.scrollTop;
+        const rects=barRects.current;
+        for(const tid of Object.keys(rects)){
+          const br=rects[tid];
+          if(mx>=br.left&&mx<=br.right&&my>=br.top&&my<=br.bottom){
+            // このタスクにドロップ
+            if(tid!==depDrag.fromTaskId){
+              // 同じプロジェクト内か確認
+              let sameProject=false;
+              projects.forEach(p=>{
+                const hasFrom=p.tasks.some(t=>t.id===depDrag.fromTaskId);
+                const hasTo=p.tasks.some(t=>t.id===tid);
+                if(hasFrom&&hasTo)sameProject=true;
+              });
+              if(sameProject){
+                setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>{
+                  if(t.id===tid){
+                    const deps=t.dependencies||[];
+                    if(!deps.includes(depDrag.fromTaskId))return{...t,dependencies:[...deps,depDrag.fromTaskId]};
+                  }
+                  return t;
+                })})));
+              }
             }
-            return t;
-          })})));
+            break;
+          }
         }
       }
       setDepDrag(null);
     };
     window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);
     return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)};
-  },[depDrag]);
+  },[depDrag,projects]);
 
   const initialScrollRef=useRef(false);
   useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
