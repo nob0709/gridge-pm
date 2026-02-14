@@ -1780,9 +1780,10 @@ export default function App() {
   }, [importText, importProjectName]);
 
   // Drag
-  const startDrag = useCallback((e,task,type)=>{if(e.button!==0)return;e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end),projectId:t.projectId}}));setDrag({task,type:type||"move",startX:e.clientX,startY:e.clientY,active,od});setDragShift(0)},[selIds,projects]);
-  useEffect(()=>{if(!drag)return;
-    // 依存関係で連動するタスクを取得
+  const depOriginalRef = useRef({});
+  const depTasksRef = useRef(new Set());
+  const startDrag = useCallback((e,task,type)=>{if(e.button!==0)return;e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end),projectId:t.projectId}}));
+    // 依存関係で連動するタスクを取得し、元の位置を保存
     const getDependentTasks = (taskIds, allTasks) => {
       const result = new Set(taskIds);
       let changed = true;
@@ -1799,16 +1800,25 @@ export default function App() {
     };
     const allTasks = [];
     projects.forEach(p => p.tasks.forEach(t => allTasks.push(t)));
-    const depTasks = drag.type==="move" ? getDependentTasks(Array.from(drag.active), allTasks) : new Set();
-    // 依存タスクの元の位置を保存（ドラッグ開始時点での位置を記録）
-    const depOriginal = {};
-    if(drag.type==="move") {
+    const moveType = type || "move";
+    if(moveType === "move") {
+      const depTasks = getDependentTasks(Array.from(active), allTasks);
+      depTasksRef.current = depTasks;
+      const depOrig = {};
       allTasks.forEach(t => {
-        if(depTasks.has(t.id) && !drag.od[t.id]) {
-          depOriginal[t.id] = {start: new Date(t.start), end: new Date(t.end)};
+        if(depTasks.has(t.id) && !od[t.id]) {
+          depOrig[t.id] = {start: new Date(t.start), end: new Date(t.end)};
         }
       });
+      depOriginalRef.current = depOrig;
+    } else {
+      depTasksRef.current = new Set();
+      depOriginalRef.current = {};
     }
+    setDrag({task,type:moveType,startX:e.clientX,startY:e.clientY,active,od});setDragShift(0)},[selIds,projects]);
+  useEffect(()=>{if(!drag)return;
+    const depTasks = depTasksRef.current;
+    const depOriginal = depOriginalRef.current;
     let lastY=drag.startY;
     const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){const depO=depOriginal[t.id];if(depO)return{...t,start:addDays(depO.start,ds),end:addDays(depO.end,ds)}}return t})})))};
     const onU=e=>{
@@ -1837,7 +1847,7 @@ export default function App() {
       }
       setDrag(null);setDragShift(0);setDragPos(null);
     };
-    window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW,projects,rowList,moveTaskToProject]);
+    window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW,rowList,moveTaskToProject]);
 
   // Zoom - 非passiveリスナーでブラウザズームを無効化（Mac trackpad対応）
   const handleWheel = useCallback(e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const g=ganttRef.current;if(!g)return;const rect=g.getBoundingClientRect(),mx=e.clientX-rect.left,sl=g.scrollLeft,md=(sl+mx)/DW;const f=e.deltaY<0?1.15:0.87;const nDW=clamp(DW*f,MIN_DW,MAX_DW);setDayWidth(nDW);requestAnimationFrame(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=md*nDW-mx})},[DW]);
