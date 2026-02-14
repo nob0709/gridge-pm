@@ -1834,8 +1834,12 @@ export default function App() {
         <div style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4,marginTop:2}}><div style={{width:6,height:6,borderRadius:2,background:PH[tip.task.phase]?.c}}/>{PH[tip.task.phase]?.l}</div>
       </div>)})()}
 
-      {ctxMenu&&(
-        <div style={{position:"fixed",left:ctxMenu.x,top:ctxMenu.y,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",zIndex:2000,minWidth:140,padding:4}}>
+      {ctxMenu&&(()=>{
+        const menuHeight=ctxMenu.type==="project"?220:400;
+        const menuWidth=160;
+        const adjustedY=ctxMenu.y+menuHeight>window.innerHeight?Math.max(8,window.innerHeight-menuHeight-8):ctxMenu.y;
+        const adjustedX=ctxMenu.x+menuWidth>window.innerWidth?Math.max(8,window.innerWidth-menuWidth-8):ctxMenu.x;
+        return<div style={{position:"fixed",left:adjustedX,top:adjustedY,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",zIndex:2000,minWidth:140,padding:4,maxHeight:"calc(100vh - 16px)",overflowY:"auto"}}>
           {ctxMenu.type==="project"&&<React.Fragment>
             <button onClick={()=>{const newId=ctxMenu.id+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.id,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
             <button onClick={()=>{setShowNewModal(true);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📁 プロジェクトを追加"}</button>
@@ -1880,8 +1884,7 @@ export default function App() {
             <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
             <button onClick={()=>deleteTask(ctxMenu.id,ctxMenu.projectId)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,color:"#ef4444"}} onMouseEnter={e=>e.currentTarget.style.background="#fef2f2"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"🗑 削除"}</button>
           </React.Fragment>})()}
-        </div>
-      )}
+        </div>})()}
 
       {showNewModal&&<React.Fragment>
         <div onClick={()=>setShowNewModal(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1100}}/>
