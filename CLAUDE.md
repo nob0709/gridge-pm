@@ -1,4 +1,3 @@
-cat > CLAUDE.md << 'EOF'
 # Gridge Project Manager
 
 グリッジ株式会社（岡山のWeb制作・デジタルマーケティング会社）の案件管理ツール。
@@ -6,14 +5,27 @@ Vite + React で構築。現在は単一ファイル（src/App.jsx）のフロ�
 
 ## 技術スタック
 - React (Hooks: useState, useRef, useCallback, useMemo, useEffect)
-- Reactインラインスタイル（CSS-in-JSオブジェクト、変数名 ST）
-- Tailwind等のCSSフレームワークは未使用
-- バックエンドなし（フロントエンドのみ、データはステート管理）
+- Tailwind CSS v4 (Viteプラグイン)
+- CSS変数によるデザイントークン管理
+- Supabase（データベース）
+- GitHub Actions（自動バックアップ）
+
+## CSS設計
+- `src/index.css` にデザイントークンとコンポーネントクラスを定義
+- デザイントークン（CSS変数）：
+  - `--color-*`: 色（primary, success, warning, danger, text, bg, border）
+  - `--font-size-*`: フォントサイズ（xs:10px, sm:11px, base:12px, md:13px, lg:14px）
+  - `--spacing-*`: 余白（xs:4px, sm:8px, md:12px, lg:16px, xl:20px）
+  - `--radius-*`: 角丸（sm:4px, md:6px, lg:8px, xl:20px, full:9999px）
+- コンポーネントクラス: `.btn`, `.chip`, `.input`, `.avatar`, `.task-bar` 等
+- 既存のインラインスタイル（STオブジェクト）は段階的に移行中
 
 ## 既存機能
 - ガントチャート（ドラッグ&ドロップで日程調整、リサイズ、今日線表示）
 - メンバービュー（担当者別グルーピング）
-- カレンダービュー（日・週・月切替）
+- カレンダービュー（日・週・月切替、無限スクロール）
+- カンバンビュー（ステータス別・プロジェクト別）
+- リストビュー（テーブル表示）
 - スムーズズーム（Ctrl+スクロール、スライダー、プリセットボタン）
 - 複数選択（クリック、Shift/Ctrl+クリック、案件名クリック）
 - マーキー選択（空白ドラッグで範囲選択）
@@ -21,6 +33,7 @@ Vite + React で構築。現在は単一ファイル（src/App.jsx）のフロ�
 - タスク詳細パネル（ダブルクリックで開く、編集・完了・コメント機能）
 - チームキャパシティ表示
 - フィルター（担当者・状態）
+- メンバー管理（社内・社外）
 
 ## チームメンバー
 - 清水 (shimizu) - 営業・全体統括 / 40h/週
@@ -36,9 +49,8 @@ Vite + React で構築。現在は単一ファイル（src/App.jsx）のフロ�
 - スタイルオブジェクトは `ST` という変数名（`S` は環境で衝突する）
 - 小数は必ず `0.5` のように書く（`.5` だと `?.` と誤認される）
 - JSXフラグメントは `<React.Fragment>` を使う（`<>` ショートハンドは避ける）
-- @import は使わない（フォントは <link> タグで読み込み）
+- 新規スタイルはできるだけCSSクラス（index.css）で定義し、CSS変数を活用する
 
 ## 開発コマンド
 - `npm run dev` - 開発サーバー起動
 - `npm run build` - ビルド
-EOF
