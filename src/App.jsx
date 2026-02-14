@@ -874,7 +874,7 @@ export default function App() {
   },[]);
 
   // Marquee
-  const handleMStart = useCallback(e=>{if(e.target.closest("[data-bar]"))return;if(e.button!==0)return;const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();setMarquee({sx:e.clientX-rect.left,sy:e.clientY-rect.top,cx:e.clientX-rect.left,cy:e.clientY-rect.top});setMActive(true);if(!(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(new Set())},[]);
+  const handleMStart = useCallback(e=>{if(e.target.closest("[data-bar]"))return;if(e.button!==0)return;const cont=bodyRef.current;if(!cont)return;const gantt=ganttRef.current;if(!gantt)return;const rect=cont.getBoundingClientRect();const scrollX=gantt.scrollLeft,scrollY=gantt.scrollTop;setMarquee({sx:e.clientX-rect.left,sy:e.clientY-rect.top,cx:e.clientX-rect.left,cy:e.clientY-rect.top,scrollX,scrollY});setMActive(true);if(!(e.shiftKey||e.metaKey||e.ctrlKey))setSelIds(new Set())},[]);
 
   // Double-click to create new task
   const handleBodyDblClick = useCallback(e=>{
@@ -913,7 +913,45 @@ export default function App() {
     setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
     setOpenTid(newId);
   },[view,rowList,DW,dateRange]);
-  useEffect(()=>{if(!mActive||!marquee)return;const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}setSelIds(hit)};const onU=()=>{setMActive(false);setMarquee(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee]);
+
+  // ドラッグで新規タスク作成
+  const createTaskFromDrag = useCallback((mx1,my1,mx2,my2,scrollX,scrollY)=>{
+    if(view==="timeline")return;
+    // スクロール込みの座標に変換
+    const x1=mx1+scrollX,x2=mx2+scrollX,y=my1+scrollY;
+    // プロジェクト行を特定
+    let rowY=0,targetProj=null;
+    for(const row of rowList){
+      const h=row.type==="project"||row.type==="member"?44:36;
+      if(y>=rowY&&y<rowY+h){
+        if(row.type==="project")targetProj=row.project;
+        else if(row.type==="task")targetProj=row.project;
+        break;
+      }
+      rowY+=h;
+      if(row.type==="project")targetProj=row.project;
+    }
+    if(!targetProj)return;
+    // 日付範囲を計算
+    const startIdx=Math.floor(x1/DW),endIdx=Math.floor(x2/DW);
+    const startDate=dateRange[startIdx],endDate=dateRange[endIdx];
+    if(!startDate||!endDate)return;
+    // 新規タスク作成
+    const newId=targetProj.id+"-"+Date.now();
+    const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:new Date(startDate),end:new Date(endDate),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
+    setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
+    setOpenTid(newId);
+  },[view,rowList,DW,dateRange]);
+
+  useEffect(()=>{if(!mActive||!marquee)return;let lastHit=new Set();const onM=e=>{const cont=bodyRef.current;if(!cont)return;const rect=cont.getBoundingClientRect();const x=e.clientX-rect.left,y=e.clientY-rect.top;setMarquee(prev=>prev?{...prev,cx:x,cy:y}:null);const rects=barRects.current;const mx1=Math.min(marquee.sx,x),my1=Math.min(marquee.sy,y),mx2=Math.max(marquee.sx,x),my2=Math.max(marquee.sy,y);const hit=new Set();for(const tid of Object.keys(rects)){const br=rects[tid];if(br.left<mx2&&br.right>mx1&&br.top<my2&&br.bottom>my1)hit.add(tid)}lastHit=hit;setSelIds(hit)};const onU=()=>{
+    // ドラッグ終了時：選択タスクがなく、一定の幅があれば新規タスク作成
+    const mx1=Math.min(marquee.sx,marquee.cx),my1=Math.min(marquee.sy,marquee.cy),mx2=Math.max(marquee.sx,marquee.cx),my2=Math.max(marquee.sy,marquee.cy);
+    const dragW=mx2-mx1;
+    if(lastHit.size===0&&dragW>10){
+      createTaskFromDrag(mx1,my1,mx2,my2,marquee.scrollX||0,marquee.scrollY||0);
+    }
+    setMActive(false);setMarquee(null);
+  };window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee,createTaskFromDrag]);
 
   const initialScrollRef=useRef(false);
   useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
@@ -1073,7 +1111,7 @@ export default function App() {
                   {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #6366f1",background:"rgba(99,102,241,.06)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
                   {rowList.map(row=>{
                     if(row.type==="project"||row.type==="member")return<div key={"gr-"+(row.project?.id||row.member?.id)} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
-                    const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=Math.max(4,right-left-1);
+                    const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=Math.max(4,right-left);
                     const ph=PH[t.phase]||{c:"#666"};const isMs=t.type==="milestone";const mem=TEAM.find(x=>x.id===t.assignee);
                     const barColor=mem?.color||"#9ca3af"; // 担当者の色、未設定はグレー
                     const isSel=selIds.has(t.id);const isDrg=drag&&drag.active&&drag.active.has(t.id);
