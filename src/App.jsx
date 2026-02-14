@@ -1102,6 +1102,8 @@ export default function App() {
   const [showMemberModal, setShowMemberModal] = useState(false); // メンバー管理モーダル
   const [teamMembers, setTeamMembers] = useState(TEAM); // メンバーリスト（編集可能）
   const [editingMember, setEditingMember] = useState(null); // 編集中のメンバー
+  const [showSearch, setShowSearch] = useState(false); // 検索パネル表示
+  const [searchQuery, setSearchQuery] = useState(""); // 検索クエリ
   const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
@@ -1667,6 +1669,18 @@ export default function App() {
       })).sort((a, b) => a.minStart - b.minStart);
       return sortedComponents.flatMap(c => c.tasks);
     };
+    if(view==="dashboard"){
+      // ダッシュボードビュー: メンバーのワークロードのみ表示（タスクなし）
+      const rows=[];
+      teamMembers.forEach(m=>{
+        const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push(t)}));
+        rows.push({type:"member",member:m,count:mt.length});
+      });
+      // 未確定も追加
+      const unassigned=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(!t.assignee)unassigned.push(t)}));
+      rows.push({type:"member",member:{id:"unassigned",name:"未確定",role:"担当者未設定",color:"#9ca3af",av:"？",type:"internal"},count:unassigned.length});
+      return rows;
+    }
     if(view==="timeline"){const rows=[];teamMembers.forEach(m=>{const mt=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(t.assignee===m.id)mt.push({...t,projName:p.name})}));if(mt.length>0){const sorted=sortByDependencyChain(mt);rows.push({type:"member",member:m,count:mt.length});sorted.forEach(t=>rows.push({type:"task",task:t,project:{name:t.projName}}))}});
       // 未確定（担当者未設定）タスクを追加
       const unassigned=[];filtered.forEach(p=>p.tasks.forEach(t=>{if(!t.assignee)unassigned.push({...t,projName:p.name})}));
@@ -2114,9 +2128,9 @@ export default function App() {
     return caps;
   },[headerRows.bot,projects,zoomLevel,teamMembers]);
 
-  // メンバーごとの週別ワークロード計算（メンバービュー用）
+  // メンバーごとの週別ワークロード計算（メンバービュー/ダッシュボード用）
   const memberWorkloads = useMemo(()=>{
-    if(view!=="timeline")return{};
+    if(view!=="timeline"&&view!=="dashboard")return{};
     const result={};
 
     // 日表示の場合は週単位でグループ化
@@ -2159,6 +2173,28 @@ export default function App() {
           const util=weeklyCapacity>0?Math.round(workload/weeklyCapacity*100):0;
           result[m.id][wk]={workload:Math.round(workload*10)/10,capacity:weeklyCapacity,util,left:g.left,width:g.width};
         });
+      });
+      // 未確定タスクのワークロード計算（日表示）
+      result["unassigned"]={};
+      const unassignedCapacity=40;
+      Object.entries(weekGroups).forEach(([wk,g])=>{
+        let workload=0;
+        projects.forEach(p=>p.tasks.forEach(t=>{
+          if(!t.assignee&&t.type!=="milestone"){
+            const s=new Date(t.start),e=new Date(t.end);
+            if(s<=g.end&&e>=g.start){
+              const os=s>g.start?s:g.start,oe=e<g.end?e:g.end;
+              let dInPeriod=0;
+              const cur=new Date(os);
+              while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              const totalDays=diffD(t.start,t.end)+1;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              workload+=hours;
+            }
+          }
+        }));
+        const util=unassignedCapacity>0?Math.round(workload/unassignedCapacity*100):0;
+        result["unassigned"][wk]={workload:Math.round(workload*10)/10,capacity:unassignedCapacity,util,left:g.left,width:g.width};
       });
     }else{
       // 週/月表示
@@ -2208,6 +2244,47 @@ export default function App() {
           left+=col.width;
         });
       });
+      // 未確定タスクのワークロード計算（週/月表示）
+      result["unassigned"]={};
+      const unassignedCapacity=40;
+      headerRows.bot.forEach(col=>{
+        let periodStart,periodEnd;
+        if(zoomLevel==="week"){
+          periodStart=new Date(col.key);
+          periodEnd=addDays(periodStart,4);
+        }else{
+          const parts=col.key.split("-");
+          periodStart=new Date(parseInt(parts[0]),parseInt(parts[1]),1);
+          periodEnd=new Date(parseInt(parts[0]),parseInt(parts[1])+1,0);
+        }
+        const workDaysInPeriod=zoomLevel==="week"?5:Math.round((periodEnd-periodStart)/(864e5*7)*5);
+        const periodCapacity=zoomLevel==="week"?unassignedCapacity:Math.round(unassignedCapacity*workDaysInPeriod/5);
+        let workload=0;
+        projects.forEach(p=>p.tasks.forEach(t=>{
+          if(!t.assignee&&t.type!=="milestone"){
+            const s=new Date(t.start),e=new Date(t.end);
+            if(s<=periodEnd&&e>=periodStart){
+              const os=s>periodStart?s:periodStart,oe=e<periodEnd?e:periodEnd;
+              let dInPeriod=0;
+              const cur=new Date(os);
+              while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              const totalDays=diffD(t.start,t.end)+1;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              workload+=hours;
+            }
+          }
+        }));
+        const util=periodCapacity>0?Math.round(workload/periodCapacity*100):0;
+        result["unassigned"][col.key]={workload:Math.round(workload*10)/10,capacity:periodCapacity,util,left:0,width:col.width};
+      });
+      // 未確定の列位置計算
+      let unassignedLeft=0;
+      headerRows.bot.forEach(col=>{
+        if(result["unassigned"][col.key]){
+          result["unassigned"][col.key].left=unassignedLeft;
+        }
+        unassignedLeft+=col.width;
+      });
     }
     return result;
   },[view,zoomLevel,headerRows.bot,projects,dateRange,DW,teamMembers]);
@@ -2246,8 +2323,54 @@ export default function App() {
   },[rowList,getPos,DW]);
 
   const selCount=selIds.size;
-  const isGL=view==="gantt"||view==="timeline";
+  const isGL=view==="gantt"||view==="timeline"||view==="dashboard";
   const presets=[{l:"日",dw:40},{l:"週",dw:16},{l:"月",dw:5},{l:"四半期",dw:2},{l:"年",dw:1.5}];
+
+  // 検索結果
+  const searchResults = useMemo(()=>{
+    if(!searchQuery.trim())return[];
+    const q=searchQuery.toLowerCase();
+    const results=[];
+    projects.forEach(p=>{
+      p.tasks.forEach(t=>{
+        const name=(t.name||"").toLowerCase();
+        const projName=(p.name||"").toLowerCase();
+        if(name.includes(q)||projName.includes(q)){
+          results.push({...t,projectName:p.name,projectId:p.id});
+        }
+      });
+    });
+    // 日付でソート
+    results.sort((a,b)=>new Date(a.start)-new Date(b.start));
+    return results;
+  },[searchQuery,projects]);
+
+  // 検索結果をコピー用テキストに変換
+  const searchResultsText = useMemo(()=>{
+    if(searchResults.length===0)return"";
+    const fmtDate=(d)=>{const dt=new Date(d);return`${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,"0")}/${String(dt.getDate()).padStart(2,"0")}`};
+    const grouped={};
+    searchResults.forEach(t=>{
+      const isMs=t.type==="milestone";
+      const key=isMs?t.start:`${t.start}_${t.end}`;
+      if(!grouped[key])grouped[key]={start:t.start,end:t.end,isMs,tasks:[]};
+      grouped[key].tasks.push(t);
+    });
+    const lines=[];
+    Object.values(grouped).sort((a,b)=>new Date(a.start)-new Date(b.start)).forEach(g=>{
+      if(g.isMs||g.start===g.end){
+        lines.push(`${fmtDate(g.start)}`);
+      }else{
+        lines.push(`${fmtDate(g.start)} - ${fmtDate(g.end)}`);
+      }
+      g.tasks.forEach(t=>{
+        const prefix=t.type==="milestone"?"〆":"";
+        lines.push(`${prefix}${t.name}（${t.projectName}）`);
+      });
+      lines.push("");
+    });
+    return lines.join("\n").trim();
+  },[searchResults]);
 
   if (loading) {
     return (
@@ -2271,6 +2394,7 @@ export default function App() {
           <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:8,padding:3}}>
             <button style={ST.tab(view==="gantt")} onClick={()=>setView("gantt")}>{"▤ ガント"}</button>
             <button style={ST.tab(view==="timeline")} onClick={()=>setView("timeline")}>{"👤 メンバー"}</button>
+            <button style={ST.tab(view==="dashboard")} onClick={()=>setView("dashboard")}>{"📊 稼働"}</button>
             <button style={ST.tab(view==="calendar")} onClick={()=>setView("calendar")}>{"▦ カレンダー"}</button>
             <button style={ST.tab(view==="kanban")} onClick={()=>setView("kanban")}>{"▣ カンバン"}</button>
             <button style={ST.tab(view==="list")} onClick={()=>setView("list")}>{"≡ リスト"}</button>
@@ -2290,6 +2414,7 @@ export default function App() {
           </React.Fragment>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button style={{...ST.btnI,...(showSearch?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowSearch(!showSearch)} title="検索">{"🔍"}</button>
           <button style={{...ST.btnI,...(showCap?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowCap(!showCap)}>{"👥"}</button>
           <div style={{position:"relative"}}>
             <button style={ST.btnP} onClick={()=>setShowAddMenu(!showAddMenu)}>{"＋ 新規作成"}<span style={{marginLeft:4,fontSize:8}}>{"▼"}</span></button>
@@ -2363,7 +2488,7 @@ export default function App() {
         {view==="calendar"?<CalView projects={projects} setProjects={setProjects} today={today} onOpen={t=>setOpenTid(t.id)} members={teamMembers} filterA={filterA} filterS={filterS}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)} members={teamMembers}/>:(
           <React.Fragment>
             <div style={ST.side}>
-              <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
+              <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="dashboard"?"稼働状況":view==="timeline"?"メンバー別":"案件一覧"} ({view==="dashboard"?teamMembers.length+1:filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
                   if(row.type==="project"){const p=row.project;const isDragOver=(dragOverProjId===p.id&&dragProjId!==p.id)||(dragTaskId&&dragOverProjId===p.id&&dragTaskFromProjId!==p.id);const isEditing=editingProjectId===p.id;return(<div key={"p-"+p.id} draggable={!isEditing} onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null);if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} onDoubleClick={()=>setEditingProjectId(p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>{isEditing?<input autoFocus value={p.name} onChange={e=>setProjects(ps=>ps.map(x=>x.id===p.id?{...x,name:e.target.value}:x))} onBlur={()=>setEditingProjectId(null)} onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingProjectId(null)}} onClick={e=>e.stopPropagation()} style={{flex:1,padding:"2px 6px",fontSize:13,fontWeight:600,border:"1px solid #6366f1",borderRadius:4,outline:"none",background:"#fff"}}/>:<div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div>}<span style={{fontSize:11,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
@@ -2373,7 +2498,7 @@ export default function App() {
                     {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
                     <div style={{width:6,height:6,borderRadius:2,flexShrink:0,background:PH[t.phase]?.c}}/>
                     <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",opacity:t.done?0.5:1}}>{t.name||"新規タスク"}{view==="timeline"&&<span style={{color:"#9ca3af",marginLeft:6}}>{pName}</span>}</div>
-                    {view!=="timeline"&&m&&<div style={ST.tav(m.color)}>{m.av}</div>}
+                    {view!=="timeline"&&view!=="dashboard"&&m&&<div style={ST.tav(m.color)}>{m.av}</div>}
                   </div>);
                 })}
               </div>
@@ -2444,7 +2569,7 @@ export default function App() {
                       :(<div data-bar="1" data-taskid={t.id} data-projectid={row.project?.id} style={{...ST.bar(left,width,hasEst?barColor+"40":barColor,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&!depDrag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                         {hasEst&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:filledW,background:barColor,borderRadius:estRatio>=1?"5px":"5px 0 0 5px"}}/>}
                         <div style={ST.rh("l")} onMouseDown={e=>startDrag(e,t,"resize-left")}/>
-                        {width>30&&<span style={{pointerEvents:"none",whiteSpace:"nowrap",position:"relative",zIndex:1}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&view!=="timeline"&&<span style={{opacity:0.8,marginRight:4}}>{mem.av}</span>}{t.name||"新規タスク"}</span>}
+                        {width>30&&<span style={{pointerEvents:"none",whiteSpace:"nowrap",position:"relative",zIndex:1}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&view!=="timeline"&&view!=="dashboard"&&<span style={{opacity:0.8,marginRight:4}}>{mem.av}</span>}{t.name||"新規タスク"}</span>}
                         <div style={ST.rh("r")} onMouseDown={e=>startDrag(e,t,"resize-right")}/>
                         <div onMouseDown={e=>{e.stopPropagation();setDepDrag({fromTaskId:t.id,fromProjectId:row.project?.id,fromX:left+width,fromY:0,mouseX:e.clientX,mouseY:e.clientY})}} style={{position:"absolute",right:-6,top:"50%",transform:"translateY(-50%)",width:10,height:10,borderRadius:"50%",background:"#6366f1",border:"2px solid #fff",cursor:"crosshair",boxShadow:"0 1px 3px rgba(0,0,0,.2)",zIndex:10,opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"}/>
                       </div>)}
@@ -2493,6 +2618,41 @@ export default function App() {
                 </div>
               ))}
             </React.Fragment>}
+          </div>
+        )}
+
+        {showSearch&&(
+          <div style={{width:320,background:"#fff",borderLeft:"1px solid #e5e7eb",display:"flex",flexDirection:"column",overflow:"hidden",flexShrink:0}}>
+            <div style={{padding:"16px",borderBottom:"1px solid #e5e7eb"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <span style={{fontSize:14,fontWeight:600,color:"#1f2937"}}>検索</span>
+                <button onClick={()=>setShowSearch(false)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:16,color:"#6b7280",padding:4}}>{"×"}</button>
+              </div>
+              <input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="タスク名・プロジェクト名で検索..." style={{width:"100%",padding:"10px 12px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            {searchResults.length>0&&(
+              <div style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:12,color:"#6b7280"}}>{searchResults.length}件の結果</span>
+                <button onClick={()=>{navigator.clipboard.writeText(searchResultsText);alert("コピーしました")}} style={{padding:"6px 12px",border:"1px solid #6366f1",borderRadius:6,background:"#fff",color:"#6366f1",fontSize:11,fontWeight:600,cursor:"pointer"}}>コピー</button>
+              </div>
+            )}
+            <div style={{flex:1,overflowY:"auto",padding:8}}>
+              {searchQuery.trim()&&searchResults.length===0&&(
+                <div style={{padding:16,textAlign:"center",color:"#6b7280",fontSize:12}}>結果が見つかりません</div>
+              )}
+              {searchResults.map((t,i)=>{
+                const isMs=t.type==="milestone";
+                const fmtD=(d)=>{const dt=new Date(d);return`${dt.getMonth()+1}/${dt.getDate()}`};
+                return(<div key={t.id+"-"+i} style={{padding:"10px 12px",borderRadius:6,marginBottom:4,background:"#f9fafb",cursor:"pointer"}} onClick={()=>setOpenTid(t.id)}>
+                  <div style={{fontSize:12,fontWeight:500,color:"#1f2937",marginBottom:4}}>{isMs&&<span style={{marginRight:4}}>{"〆"}</span>}{t.name||"新規タスク"}</div>
+                  <div style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:8}}>
+                    <span>{fmtD(t.start)}{!isMs&&t.start!==t.end&&` - ${fmtD(t.end)}`}</span>
+                    <span style={{color:"#9ca3af"}}>|</span>
+                    <span>{t.projectName}</span>
+                  </div>
+                </div>);
+              })}
+            </div>
           </div>
         )}
       </div>
