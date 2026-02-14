@@ -962,6 +962,52 @@ export default function App() {
     setDelConfirm(null);
   }, [delConfirm]);
 
+  // Duplicate task
+  const duplicateTask = useCallback((taskId, projectId) => {
+    setProjects(ps => ps.map(p => {
+      if (p.id !== projectId) return p;
+      const task = p.tasks.find(t => t.id === taskId);
+      if (!task) return p;
+      const newTask = {
+        ...task,
+        id: "t" + Date.now(),
+        name: task.name + " (コピー)",
+        done: false,
+        dependencies: [], // 依存関係はリセット
+      };
+      const idx = p.tasks.findIndex(t => t.id === taskId);
+      const newTasks = [...p.tasks];
+      newTasks.splice(idx + 1, 0, newTask);
+      return { ...p, tasks: newTasks };
+    }));
+    setCtxMenu(null);
+  }, []);
+
+  // Duplicate project
+  const duplicateProject = useCallback((projectId) => {
+    const proj = projects.find(p => p.id === projectId);
+    if (!proj) return;
+    const newProjId = "p" + Date.now();
+    const newProj = {
+      ...proj,
+      id: newProjId,
+      name: proj.name + " (コピー)",
+      tasks: proj.tasks.map(t => ({
+        ...t,
+        id: "t" + Date.now() + Math.random().toString(36).substr(2, 5),
+        done: false,
+        dependencies: [], // 依存関係はリセット
+      })),
+    };
+    setProjects(ps => {
+      const idx = ps.findIndex(p => p.id === projectId);
+      const newPs = [...ps];
+      newPs.splice(idx + 1, 0, newProj);
+      return newPs;
+    });
+    setCtxMenu(null);
+  }, [projects]);
+
   // Context menu handler
   const handleContextMenu = useCallback((e, type, id, projectId) => {
     e.preventDefault();
@@ -1786,12 +1832,15 @@ export default function App() {
             <button onClick={()=>{setShowNewModal(true);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📁 プロジェクトを追加"}</button>
             <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
             <button onClick={()=>{const p=projects.find(x=>x.id===ctxMenu.id);if(p){const name=prompt('案件名を入力',p.name);if(name){setProjects(ps=>ps.map(x=>x.id===ctxMenu.id?{...x,name}:x))}}setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 名前を編集"}</button>
+            <button onClick={()=>duplicateProject(ctxMenu.id)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 複製"}</button>
+            <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
             <button onClick={()=>deleteProject(ctxMenu.id)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,color:"#ef4444"}} onMouseEnter={e=>e.currentTarget.style.background="#fef2f2"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"🗑 削除"}</button>
           </React.Fragment>}
           {ctxMenu.type==="task"&&(()=>{const task=projects.flatMap(p=>p.tasks).find(t=>t.id===ctxMenu.id);const isMilestone=task?.type==="milestone";const targetIds=selIds.has(ctxMenu.id)&&selIds.size>1?Array.from(selIds):[ctxMenu.id];const isMulti=targetIds.length>1;return<React.Fragment>
             {isMulti&&<div style={{padding:"6px 12px",fontSize:11,fontWeight:600,color:"#6366f1",background:"rgba(99,102,241,.08)",borderRadius:4,marginBottom:4}}>{targetIds.length}件選択中</div>}
             <button onClick={()=>{const newId=ctxMenu.projectId+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.projectId,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.projectId?{...p,tasks:[...p.tasks,newTask]}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
             {!isMulti&&<button onClick={()=>{setOpenTid(ctxMenu.id);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 編集"}</button>}
+            {!isMulti&&<button onClick={()=>duplicateTask(ctxMenu.id,ctxMenu.projectId)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 複製"}</button>}
             <div style={{position:"relative"}} onMouseEnter={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='block'} onMouseLeave={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='none'}>
               <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"👤 担当変更"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}<span style={{fontSize:10,color:"#9ca3af",marginLeft:"auto"}}>{"▶"}</span></button>
               <div className="submenu-assignee" style={{display:"none",position:"absolute",left:"100%",top:0,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",minWidth:160,padding:4,marginLeft:4}}>
