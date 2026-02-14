@@ -87,18 +87,18 @@ const genProjects = () => {
 };
 
 const ST = {
-  tab:on=>({padding:"6px 14px",borderRadius:6,fontSize:12,fontWeight:500,cursor:"pointer",color:on?"#1f2937":"#6b7280",border:"none",background:on?"#e5e7eb":"transparent",whiteSpace:"nowrap"}),
-  btnI:{padding:"7px 8px",borderRadius:5,fontSize:12,cursor:"pointer",border:"1px solid #e5e7eb",background:"#fff",color:"#6b7280"},
-  btnP:{padding:"7px 14px",borderRadius:5,fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",gap:6},
+  tab:on=>({padding:"6px 14px",borderRadius:6,fontSize:13,fontWeight:500,cursor:"pointer",color:on?"#1f2937":"#6b7280",border:"none",background:on?"#e5e7eb":"transparent",whiteSpace:"nowrap"}),
+  btnI:{padding:"7px 8px",borderRadius:5,fontSize:13,cursor:"pointer",border:"1px solid #e5e7eb",background:"#fff",color:"#6b7280"},
+  btnP:{padding:"7px 14px",borderRadius:5,fontSize:13,fontWeight:500,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",display:"flex",alignItems:"center",gap:6},
   fbar:{display:"flex",alignItems:"center",gap:8,padding:"10px 20px",borderBottom:"1px solid #e5e7eb",background:"#fff",flexShrink:0,flexWrap:"wrap"},
-  chip:(on,c)=>({padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid "+(on?(c||"#6366f1"):"#e5e7eb"),background:on?(c?c+"18":"rgba(99,102,241,.08)"):"transparent",color:on?(c||"#6366f1"):"#6b7280"}),
-  sbar:on=>({display:"flex",alignItems:"center",gap:12,padding:"8px 20px",background:on?"rgba(99,102,241,.06)":"#fff",borderBottom:"1px solid "+(on?"rgba(99,102,241,.3)":"#e5e7eb"),fontSize:12,color:"#6366f1",flexShrink:0,minHeight:38}),
-  sbtn:{padding:"3px 10px",borderRadius:4,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid rgba(99,102,241,.4)",background:"transparent",color:"#6366f1"},
+  chip:(on,c)=>({padding:"4px 10px",borderRadius:20,fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid "+(on?(c||"#6366f1"):"#e5e7eb"),background:on?(c?c+"18":"rgba(99,102,241,.08)"):"transparent",color:on?(c||"#6366f1"):"#6b7280"}),
+  sbar:on=>({display:"flex",alignItems:"center",gap:12,padding:"8px 20px",background:on?"rgba(99,102,241,.06)":"#fff",borderBottom:"1px solid "+(on?"rgba(99,102,241,.3)":"#e5e7eb"),fontSize:13,color:"#6366f1",flexShrink:0,minHeight:38}),
+  sbtn:{padding:"3px 10px",borderRadius:4,fontSize:12,fontWeight:500,cursor:"pointer",border:"1px solid rgba(99,102,241,.4)",background:"transparent",color:"#6366f1"},
   side:{width:280,minWidth:280,borderRight:"1px solid #e5e7eb",display:"flex",flexDirection:"column",background:"#fff",zIndex:10},
-  prow:isH=>({display:"flex",alignItems:"center",padding:"0 10px",height:isH?44:36,cursor:"pointer",gap:6,fontSize:isH?13:13,userSelect:"none",fontWeight:isH?600:400,background:isH?"#f9fafb":"transparent",borderBottom:isH?"1px solid #e5e7eb":"none",color:isH?"#1f2937":"#4b5563"}),
-  tog:open=>({width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#9ca3af",fontSize:10,transform:open?"rotate(90deg)":"none",flexShrink:0}),
-  tav:c=>({width:22,height:22,borderRadius:"50%",fontSize:9,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#fff",background:c}),
-  bar:(l,w,c,sel,drg)=>({position:"absolute",height:22,borderRadius:5,cursor:"grab",display:"flex",alignItems:"center",padding:"0 6px",fontSize:12,fontWeight:500,color:"#fff",zIndex:sel?5:3,overflow:"visible",whiteSpace:"nowrap",userSelect:"none",left:l,width:Math.max(w,4),top:7,background:c,outline:sel?"2px solid #6366f1":"none",outlineOffset:sel?1:0,boxShadow:sel?"0 0 8px rgba(99,102,241,.3)":(drg?"0 4px 12px rgba(0,0,0,.15)":"0 1px 3px rgba(0,0,0,.1)"),opacity:drg?0.9:1}),
+  prow:isH=>({display:"flex",alignItems:"center",padding:"0 10px",height:isH?44:36,cursor:"pointer",gap:6,fontSize:isH?14:13,userSelect:"none",fontWeight:isH?600:400,background:isH?"#f9fafb":"transparent",borderBottom:isH?"1px solid #e5e7eb":"none",color:isH?"#1f2937":"#4b5563"}),
+  tog:open=>({width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#9ca3af",fontSize:11,transform:open?"rotate(90deg)":"none",flexShrink:0}),
+  tav:c=>({width:24,height:24,borderRadius:"50%",fontSize:10,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#fff",background:c}),
+  bar:(l,w,c,sel,drg)=>({position:"absolute",height:24,borderRadius:5,cursor:"grab",display:"flex",alignItems:"center",padding:"0 6px",fontSize:12,fontWeight:500,color:"#fff",zIndex:sel?5:3,overflow:"visible",whiteSpace:"nowrap",userSelect:"none",left:l,width:Math.max(w,4),top:6,background:c,outline:sel?"2px solid #6366f1":"none",outlineOffset:sel?1:0,boxShadow:sel?"0 0 8px rgba(99,102,241,.3)":(drg?"0 4px 12px rgba(0,0,0,.15)":"0 1px 3px rgba(0,0,0,.1)"),opacity:drg?0.9:1}),
   rh:side=>({position:"absolute",top:0,bottom:0,width:8,cursor:"ew-resize",[side==="l"?"left":"right"]:-2}),
   ms:l=>({position:"absolute",zIndex:3,cursor:"grab",display:"flex",alignItems:"center",gap:4,left:l,top:10}),
   md:(c,sel)=>({width:14,height:14,transform:"rotate(45deg)",borderRadius:2,border:"2px solid "+c,background:c+"30",boxShadow:sel?"0 0 0 3px rgba(99,102,241,.3)":"none"}),
@@ -131,21 +131,21 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
   const addC = () => { if (!comment.trim()) return; const c = { id: Date.now(), text: comment.trim(), author: "shimizu", time: timeNow() }; setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, comments: [...(t.comments||[]), c] } : t) }))); setComment(""); setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50); };
   const inp = { width:"100%", padding:"8px 10px", borderRadius:6, border:"1px solid #e5e7eb", background:"#fff", color:"#1f2937", fontSize:13, fontFamily:"inherit", outline:"none" };
   const sel = { ...inp, cursor:"pointer" };
-  const lab = { fontSize:11, fontWeight:600, color:"#6b7280", marginBottom:4, display:"block" };
+  const lab = { fontSize:12, fontWeight:600, color:"#6b7280", marginBottom:4, display:"block" };
   return (
     <div style={{ position:"fixed", top:0, right:0, bottom:0, width:440, background:"#fff", borderLeft:"1px solid #e5e7eb", zIndex:1000, display:"flex", flexDirection:"column", boxShadow:"-8px 0 32px rgba(0,0,0,.1)" }}>
       <div style={{ padding:"16px 20px", borderBottom:"1px solid #e5e7eb", display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
         <button onClick={() => up("done", !task.done)} style={{ width:28, height:28, borderRadius:"50%", border:task.done?"none":"2px solid #d1d5db", background:task.done?"#10b981":"transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:14, flexShrink:0 }}>{task.done && "✓"}</button>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:10, color:"#6b7280" }}>{project}</div>
+          <div style={{ fontSize:11, color:"#6b7280" }}>{project}</div>
           <div style={{ fontSize:15, fontWeight:600, color:"#1f2937", textDecoration:task.done?"line-through":"none", opacity:task.done?0.5:1 }}>{task.name||"新規タスク"}</div>
         </div>
         <button onClick={onClose} style={{ width:28, height:28, border:"none", background:"#f3f4f6", borderRadius:6, cursor:"pointer", color:"#6b7280", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{"✕"}</button>
       </div>
       <div style={{ flex:1, overflowY:"auto", padding:"0 20px 20px" }}>
         <div style={{ padding:"16px 0 12px", display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:600, background:task.done?"#10b98120":ph.c+"20", color:task.done?"#10b981":ph.c }}>{task.done?"✓ 完了":ph.l}</span>
-          {task.type==="milestone"&&<span style={{ padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#f59e0b20", color:"#f59e0b" }}>{"◆ マイルストーン"}</span>}
+          <span style={{ padding:"4px 12px", borderRadius:20, fontSize:12, fontWeight:600, background:task.done?"#10b98120":ph.c+"20", color:task.done?"#10b981":ph.c }}>{task.done?"✓ 完了":ph.l}</span>
+          {task.type==="milestone"&&<span style={{ padding:"4px 10px", borderRadius:20, fontSize:12, fontWeight:600, background:"#f59e0b20", color:"#f59e0b" }}>{"◆ マイルストーン"}</span>}
         </div>
         <div style={{ display:"grid", gap:16 }}>
           <div><label style={lab}>タスク名</label><input value={task.name} onChange={e=>up("name",e.target.value)} style={inp} autoFocus/></div>
@@ -163,14 +163,14 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
             <div><label style={lab}>開始日</label><input type="date" value={fmtISO(task.start)} onChange={e=>{if(e.target.value)up("start",new Date(e.target.value))}} style={inp}/></div>
             <div><label style={lab}>終了日</label><input type="date" value={fmtISO(task.end)} onChange={e=>{if(e.target.value)up("end",new Date(e.target.value))}} style={inp}/></div>
           </div>
-          <div style={{ fontSize:11, color:"#6b7280" }}>{diffD(task.start,task.end)+1}日間 ({fmtDF(task.start)} → {fmtDF(task.end)})</div>
+          <div style={{ fontSize:12, color:"#6b7280" }}>{diffD(task.start,task.end)+1}日間 ({fmtDF(task.start)} → {fmtDF(task.end)})</div>
           {task.type!=="milestone"&&<div>
             <label style={lab}>見積もり工数</label>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <input type="number" step="0.5" min="0" value={task.estimatedHours!=null?task.estimatedHours:""} onChange={e=>{const v=e.target.value;up("estimatedHours",v===""?null:parseFloat(v))}} placeholder={"未入力 = "+(diffD(task.start,task.end)+1)*8+"h（バー日数×8h）"} style={{...inp,flex:1}}/>
               <span style={{ fontSize:13, color:"#6b7280", flexShrink:0 }}>h</span>
             </div>
-            {task.estimatedHours!=null&&<div style={{ fontSize:10, color:"#6366f1", marginTop:4 }}>{"⏱ 実工数: "+task.estimatedHours+"h / バー: "+(diffD(task.start,task.end)+1)+"日間（"+(diffD(task.start,task.end)+1)*8+"h）"}</div>}
+            {task.estimatedHours!=null&&<div style={{ fontSize:11, color:"#6366f1", marginTop:4 }}>{"⏱ 実工数: "+task.estimatedHours+"h / バー: "+(diffD(task.start,task.end)+1)+"日間（"+(diffD(task.start,task.end)+1)*8+"h）"}</div>}
           </div>}
           <div>
             <label style={lab}>依存タスク（このタスクの前に完了が必要）</label>
@@ -182,18 +182,18 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
                 </label>
               )})}
             </div>:<div style={{fontSize:12,color:"#9ca3af",padding:8}}>他にタスクがありません</div>}
-            {(task.dependencies||[]).length>0&&<div style={{fontSize:10,color:"#6366f1",marginTop:6}}>{(task.dependencies||[]).length}件の依存タスク</div>}
+            {(task.dependencies||[]).length>0&&<div style={{fontSize:11,color:"#6366f1",marginTop:6}}>{(task.dependencies||[]).length}件の依存タスク</div>}
           </div>
           <div><label style={lab}>説明・メモ</label><textarea value={task.desc||""} onChange={e=>up("desc",e.target.value)} placeholder="タスクの詳細、注意事項など..." rows={4} style={{...inp,resize:"vertical",lineHeight:1.6}}/></div>
         </div>
         <div style={{ marginTop:24 }}>
-          <div style={{ fontSize:11, fontWeight:600, color:"#6b7280", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>コメント{task.comments&&task.comments.length>0&&<span style={{ background:"#6366f1", color:"#fff", borderRadius:10, padding:"1px 7px", fontSize:10 }}>{task.comments.length}</span>}</div>
+          <div style={{ fontSize:12, fontWeight:600, color:"#6b7280", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>コメント{task.comments&&task.comments.length>0&&<span style={{ background:"#6366f1", color:"#fff", borderRadius:10, padding:"1px 7px", fontSize:11 }}>{task.comments.length}</span>}</div>
           <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:12 }}>
             {(!task.comments||task.comments.length===0)&&<div style={{ padding:16, textAlign:"center", color:"#6b7280", fontSize:12, background:"#f9fafb", borderRadius:8 }}>まだコメントはありません</div>}
             {(task.comments||[]).map(c => { const a = members.find(x=>x.id===c.author)||members[0]; return (
               <div key={c.id} style={{ display:"flex", gap:10, padding:10, background:"#f9fafb", borderRadius:8 }}>
-                <div style={{ width:28, height:28, borderRadius:"50%", background:a.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"#fff", flexShrink:0 }}>{a.av}</div>
-                <div style={{ flex:1 }}><div style={{ display:"flex", alignItems:"baseline", gap:8 }}><span style={{ fontSize:12, fontWeight:600, color:"#1f2937" }}>{a.name}</span><span style={{ fontSize:10, color:"#6b7280" }}>{c.time}</span></div><div style={{ fontSize:13, color:"#374151", lineHeight:1.5, marginTop:2, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>{c.text}</div></div>
+                <div style={{ width:28, height:28, borderRadius:"50%", background:a.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#fff", flexShrink:0 }}>{a.av}</div>
+                <div style={{ flex:1 }}><div style={{ display:"flex", alignItems:"baseline", gap:8 }}><span style={{ fontSize:13, fontWeight:600, color:"#1f2937" }}>{a.name}</span><span style={{ fontSize:11, color:"#6b7280" }}>{c.time}</span></div><div style={{ fontSize:13, color:"#374151", lineHeight:1.5, marginTop:2, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>{c.text}</div></div>
               </div>); })}
             <div ref={endRef}/>
           </div>
@@ -521,12 +521,12 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
                 const barColor = mem?.color || "#9ca3af";
                 return (
                   <div key={t.id} onClick={() => onOpen(t)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", marginBottom: 8, background: barColor + "10", borderLeft: `4px solid ${barColor}`, borderRadius: 6, cursor: "pointer" }}>
-                    {mem && <div style={{ width: 28, height: 28, borderRadius: "50%", background: barColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#fff" }}>{mem.av}</div>}
+                    {mem && <div style={{ width: 28, height: 28, borderRadius: "50%", background: barColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#fff" }}>{mem.av}</div>}
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937", textDecoration: t.done ? "line-through" : "none", opacity: t.done ? 0.5 : 1 }}>{t.name}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{t.projectName}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{t.projectName}</div>
                     </div>
-                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{fmtD(t.start)} 〜 {fmtD(t.end)}</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>{fmtD(t.start)} 〜 {fmtD(t.end)}</div>
                   </div>
                 );
               })}
@@ -539,7 +539,7 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
         <React.Fragment>
           {/* 曜日ヘッダー */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", background: "#fff", flexShrink: 0 }}>
-            {DN_MON.map((d, i) => <div key={d} style={{ padding: calMode === "week" ? 12 : 10, textAlign: "center", fontSize: 11, fontWeight: 600, color: i >= 5 ? "#9ca3af" : "#6b7280" }}>{d}</div>)}
+            {DN_MON.map((d, i) => <div key={d} style={{ padding: calMode === "week" ? 12 : 10, textAlign: "center", fontSize: 12, fontWeight: 600, color: i >= 5 ? "#9ca3af" : "#6b7280" }}>{d}</div>)}
           </div>
           <div style={{ flex: 1, overflow: "auto" }} ref={scrollRef} onScroll={handleMonthScroll}>
             {weeksData.map((wd, wi) => {
@@ -559,9 +559,9 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
                       return (
                         <div key={di} style={{ minHeight: DATE_H + contentH, background: isT ? "rgba(239,68,68,.08)" : (isWeekend ? "#f9fafb" : "#fff"), borderRight: di < 6 ? "1px solid #f3f4f6" : "none" }}>
                           <div style={{ padding: calMode === "week" ? "8px 10px" : "4px 6px", height: DATE_H, display: "flex", alignItems: calMode === "week" ? "flex-start" : "center", flexDirection: calMode === "week" ? "column" : "row", gap: 4 }}>
-                            {calMode === "month" && d.getDate() === 1 && <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 500 }}>{d.getMonth() + 1}月</span>}
+                            {calMode === "month" && d.getDate() === 1 && <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 500 }}>{d.getMonth() + 1}月</span>}
                             <div style={isT ? { color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#ef4444", borderRadius: "50%", fontSize: 12 } : { fontSize: calMode === "week" ? 14 : 12, fontWeight: 500, color: "#4b5563" }}>{d.getDate()}</div>
-                            {calMode === "week" && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{MN[d.getMonth()]}</div>}
+                            {calMode === "week" && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{MN[d.getMonth()]}</div>}
                           </div>
                         </div>
                       );
@@ -648,12 +648,12 @@ function KanbanView({ projects, setProjects, onOpen, members }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#f8f7f4" }}>
       <div style={{ padding: "12px 20px", borderBottom: "1px solid #e5e7eb", background: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 11, color: "#6b7280" }}>表示:</span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>表示:</span>
         <div style={{ display: "flex", gap: 2, background: "#f3f4f6", borderRadius: 6, padding: 2 }}>
-          <button onClick={() => setKanbanMode("status")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: kanbanMode === "status" ? "#fff" : "transparent", color: kanbanMode === "status" ? "#1f2937" : "#6b7280", boxShadow: kanbanMode === "status" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>ステータス別</button>
-          <button onClick={() => setKanbanMode("project")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: kanbanMode === "project" ? "#fff" : "transparent", color: kanbanMode === "project" ? "#1f2937" : "#6b7280", boxShadow: kanbanMode === "project" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>プロジェクト別</button>
+          <button onClick={() => setKanbanMode("status")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: kanbanMode === "status" ? "#fff" : "transparent", color: kanbanMode === "status" ? "#1f2937" : "#6b7280", boxShadow: kanbanMode === "status" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>ステータス別</button>
+          <button onClick={() => setKanbanMode("project")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: kanbanMode === "project" ? "#fff" : "transparent", color: kanbanMode === "project" ? "#1f2937" : "#6b7280", boxShadow: kanbanMode === "project" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>プロジェクト別</button>
         </div>
-        {kanbanMode === "status" && <span style={{ fontSize: 10, color: "#9ca3af", marginLeft: 8 }}>ドラッグでステータス変更</span>}
+        {kanbanMode === "status" && <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>ドラッグでステータス変更</span>}
       </div>
       <div style={{ flex: 1, display: "flex", gap: 16, padding: 20, overflowX: "auto" }}>
         {columns.map(col => (
@@ -703,13 +703,13 @@ function KanbanView({ projects, setProjects, onOpen, members }) {
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 500, color: "#1f2937", marginBottom: 8 }}>{task.name || "新規タスク"}</div>
-                    {kanbanMode === "status" && <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>{task.projectName}</div>}
+                    {kanbanMode === "status" && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{task.projectName}</div>}
                     {kanbanMode === "project" && st && <div style={{ fontSize: 10, color: st.color, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 6, height: 6, borderRadius: "50%", background: st.color }} />{st.label}</div>}
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: ph.c + "20", color: ph.c }}>{ph.l}</span>
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: ph.c + "20", color: ph.c }}>{ph.l}</span>
                       {mem && <div style={{ width: 20, height: 20, borderRadius: "50%", background: mem.color, color: "#fff", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{mem.av}</div>}
                       <span style={{ fontSize: 10, color: hasEst ? "#6366f1" : "#9ca3af", fontWeight: hasEst ? 500 : 400 }}>{hours}h</span>
-                      <span style={{ marginLeft: "auto", fontSize: 10, color: "#9ca3af" }}>{fmtD(task.start)}〜{fmtD(task.end)}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>{fmtD(task.start)}〜{fmtD(task.end)}</span>
                     </div>
                   </div>
                 );
@@ -761,27 +761,27 @@ function ListView({ projects, setProjects, onOpen, members }) {
     })));
   };
 
-  const thStyle = { padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", position: "sticky", top: 0, zIndex: 1 };
+  const thStyle = { padding: "10px 12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", position: "sticky", top: 0, zIndex: 1 };
   const tdStyle = { padding: "10px 12px", fontSize: 12, color: "#374151", borderBottom: "1px solid #f3f4f6", verticalAlign: "middle" };
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#f8f7f4" }}>
       <div style={{ padding: "12px 20px", borderBottom: "1px solid #e5e7eb", background: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 11, color: "#6b7280" }}>グループ:</span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>グループ:</span>
         <div style={{ display: "flex", gap: 2, background: "#f3f4f6", borderRadius: 6, padding: 2 }}>
-          <button onClick={() => setListMode("project")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: listMode === "project" ? "#fff" : "transparent", color: listMode === "project" ? "#1f2937" : "#6b7280", boxShadow: listMode === "project" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>プロジェクト別</button>
-          <button onClick={() => setListMode("status")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: listMode === "status" ? "#fff" : "transparent", color: listMode === "status" ? "#1f2937" : "#6b7280", boxShadow: listMode === "status" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>ステータス別</button>
+          <button onClick={() => setListMode("project")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: listMode === "project" ? "#fff" : "transparent", color: listMode === "project" ? "#1f2937" : "#6b7280", boxShadow: listMode === "project" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>プロジェクト別</button>
+          <button onClick={() => setListMode("status")} style={{ padding: "4px 12px", borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: listMode === "status" ? "#fff" : "transparent", color: listMode === "status" ? "#1f2937" : "#6b7280", boxShadow: listMode === "status" ? "0 1px 2px rgba(0,0,0,.1)" : "none" }}>ステータス別</button>
         </div>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#6b7280" }}>{allTasks.length} タスク</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "#6b7280" }}>{allTasks.length} タスク</span>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
         {groups.map(group => (
           <div key={group.id} style={{ marginBottom: 16, background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "hidden" }}>
             <div onClick={() => toggleGroup(group.id)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: "#fafafa", borderBottom: collapsed[group.id] ? "none" : "1px solid #e5e7eb" }}>
-              <span style={{ fontSize: 10, color: "#9ca3af", transform: collapsed[group.id] ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s" }}>{"▶"}</span>
+              <span style={{ fontSize: 11, color: "#9ca3af", transform: collapsed[group.id] ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s" }}>{"▶"}</span>
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: group.color }} />
               <span style={{ fontWeight: 600, fontSize: 13, color: "#1f2937" }}>{group.label}</span>
-              <span style={{ fontSize: 11, color: "#6b7280", background: "#f3f4f6", borderRadius: 10, padding: "2px 8px" }}>{group.tasks.length}</span>
+              <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 10, padding: "2px 8px" }}>{group.tasks.length}</span>
             </div>
             {!collapsed[group.id] && group.tasks.length > 0 && (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -820,9 +820,9 @@ function ListView({ projects, setProjects, onOpen, members }) {
                             </div>
                           ) : <span style={{ color: "#9ca3af", fontSize: 11 }}>未設定</span>}
                         </td>
-                        <td style={tdStyle}><span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: ph.c + "18", color: ph.c, fontWeight: 500 }}>{ph.l}</span></td>
-                        {listMode === "project" && <td style={tdStyle}><span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: st?.color + "18", color: st?.color, fontWeight: 500 }}>{st?.label}</span></td>}
-                        <td style={{ ...tdStyle, fontSize: 11, color: "#6b7280" }}>{fmtD(task.start)} 〜 {fmtD(task.end)} <span style={{ color: "#9ca3af" }}>({days}日)</span></td>
+                        <td style={tdStyle}><span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: ph.c + "18", color: ph.c, fontWeight: 500 }}>{ph.l}</span></td>
+                        {listMode === "project" && <td style={tdStyle}><span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: st?.color + "18", color: st?.color, fontWeight: 500 }}>{st?.label}</span></td>}
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#6b7280" }}>{fmtD(task.start)} 〜 {fmtD(task.end)} <span style={{ color: "#9ca3af" }}>({days}日)</span></td>
                         <td style={{ ...tdStyle, fontSize: 11, color: hasEst ? "#6366f1" : "#6b7280", fontWeight: hasEst ? 500 : 400 }}>{hours}h</td>
                       </tr>
                     );
@@ -874,7 +874,7 @@ function MemberModal({ members, setMembers, onClose }) {
   const cancel = () => setEditingId(null);
 
   const inp = { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#1f2937", fontSize: 13, fontFamily: "inherit", outline: "none" };
-  const lab = { fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4, display: "block" };
+  const lab = { fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4, display: "block" };
 
   const internalMembers = members.filter(m => m.type === "internal");
   const externalMembers = members.filter(m => m.type === "external");
@@ -892,7 +892,7 @@ function MemberModal({ members, setMembers, onClose }) {
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>社内メンバー</div>
-              <button onClick={() => startNew("internal")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "1px solid #6366f1", background: "#6366f1", color: "#fff" }}>+ 追加</button>
+              <button onClick={() => startNew("internal")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "1px solid #6366f1", background: "#6366f1", color: "#fff" }}>+ 追加</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {internalMembers.map(m => (
@@ -905,7 +905,7 @@ function MemberModal({ members, setMembers, onClose }) {
                       <div><label style={lab}>色</label><div style={{ display: "flex", gap: 4 }}>{colors.map(c => <div key={c} onClick={() => setForm({ ...form, color: c })} style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2px solid #1f2937" : "2px solid transparent" }} />)}</div></div>
                       <div style={{ gridColumn: "span 4", display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
                         <button onClick={cancel} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280" }}>キャンセル</button>
-                        <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: "#6366f1", color: "#fff" }}>保存</button>
+                        <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: "#6366f1", color: "#fff" }}>保存</button>
                       </div>
                     </div>
                   ) : (
@@ -913,7 +913,7 @@ function MemberModal({ members, setMembers, onClose }) {
                       <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#fff", flexShrink: 0 }}>{m.av}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, color: "#1f2937" }}>{m.name}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>{m.role} ・ {m.hpw}h/週</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{m.role} ・ {m.hpw}h/週</div>
                       </div>
                       <button onClick={() => startEdit(m)} style={{ padding: "5px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer", border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280" }}>編集</button>
                       <button onClick={() => remove(m.id)} style={{ padding: "5px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer", border: "1px solid #fecaca", background: "#fef2f2", color: "#ef4444" }}>削除</button>
@@ -930,7 +930,7 @@ function MemberModal({ members, setMembers, onClose }) {
                     <div><label style={lab}>色</label><div style={{ display: "flex", gap: 4 }}>{colors.map(c => <div key={c} onClick={() => setForm({ ...form, color: c })} style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2px solid #1f2937" : "2px solid transparent" }} />)}</div></div>
                     <div style={{ gridColumn: "span 4", display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
                       <button onClick={cancel} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280" }}>キャンセル</button>
-                      <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: "#6366f1", color: "#fff" }}>追加</button>
+                      <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: "#6366f1", color: "#fff" }}>追加</button>
                     </div>
                   </div>
                 </div>
@@ -942,7 +942,7 @@ function MemberModal({ members, setMembers, onClose }) {
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0ea5e9" }}>社外パートナー</div>
-              <button onClick={() => startNew("external")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "1px solid #0ea5e9", background: "#0ea5e9", color: "#fff" }}>+ 追加</button>
+              <button onClick={() => startNew("external")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "1px solid #0ea5e9", background: "#0ea5e9", color: "#fff" }}>+ 追加</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {externalMembers.map(m => (
@@ -955,7 +955,7 @@ function MemberModal({ members, setMembers, onClose }) {
                       <div><label style={lab}>色</label><div style={{ display: "flex", gap: 4 }}>{colors.map(c => <div key={c} onClick={() => setForm({ ...form, color: c })} style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2px solid #1f2937" : "2px solid transparent" }} />)}</div></div>
                       <div style={{ gridColumn: "span 4", display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
                         <button onClick={cancel} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280" }}>キャンセル</button>
-                        <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: "#0ea5e9", color: "#fff" }}>保存</button>
+                        <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: "#0ea5e9", color: "#fff" }}>保存</button>
                       </div>
                     </div>
                   ) : (
@@ -963,7 +963,7 @@ function MemberModal({ members, setMembers, onClose }) {
                       <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#fff", flexShrink: 0 }}>{m.av}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, color: "#1f2937" }}>{m.name}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>{m.role} ・ {m.hpw}h/週</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{m.role} ・ {m.hpw}h/週</div>
                       </div>
                       <button onClick={() => startEdit(m)} style={{ padding: "5px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer", border: "1px solid #bae6fd", background: "#fff", color: "#0ea5e9" }}>編集</button>
                       <button onClick={() => remove(m.id)} style={{ padding: "5px 10px", borderRadius: 5, fontSize: 11, cursor: "pointer", border: "1px solid #fecaca", background: "#fef2f2", color: "#ef4444" }}>削除</button>
@@ -980,7 +980,7 @@ function MemberModal({ members, setMembers, onClose }) {
                     <div><label style={lab}>色</label><div style={{ display: "flex", gap: 4 }}>{colors.map(c => <div key={c} onClick={() => setForm({ ...form, color: c })} style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2px solid #1f2937" : "2px solid transparent" }} />)}</div></div>
                     <div style={{ gridColumn: "span 4", display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
                       <button onClick={cancel} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, cursor: "pointer", border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280" }}>キャンセル</button>
-                      <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", border: "none", background: "#0ea5e9", color: "#fff" }}>追加</button>
+                      <button onClick={save} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: "none", background: "#0ea5e9", color: "#fff" }}>追加</button>
                     </div>
                   </div>
                 </div>
@@ -2233,8 +2233,8 @@ export default function App() {
               <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
-                  if(row.type==="project"){const p=row.project;const isDragOver=(dragOverProjId===p.id&&dragProjId!==p.id)||(dragTaskId&&dragOverProjId===p.id&&dragTaskFromProjId!==p.id);const isEditing=editingProjectId===p.id;return(<div key={"p-"+p.id} draggable={!isEditing} onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null);if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} onDoubleClick={()=>setEditingProjectId(p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>{isEditing?<input autoFocus value={p.name} onChange={e=>setProjects(ps=>ps.map(x=>x.id===p.id?{...x,name:e.target.value}:x))} onBlur={()=>setEditingProjectId(null)} onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingProjectId(null)}} onClick={e=>e.stopPropagation()} style={{flex:1,padding:"2px 6px",fontSize:13,fontWeight:600,border:"1px solid #6366f1",borderRadius:4,outline:"none",background:"#fff"}}/>:<div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div>}<span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
-                  if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{row.count}</span></div>)}
+                  if(row.type==="project"){const p=row.project;const isDragOver=(dragOverProjId===p.id&&dragProjId!==p.id)||(dragTaskId&&dragOverProjId===p.id&&dragTaskFromProjId!==p.id);const isEditing=editingProjectId===p.id;return(<div key={"p-"+p.id} draggable={!isEditing} onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null);if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} onDoubleClick={()=>setEditingProjectId(p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>{isEditing?<input autoFocus value={p.name} onChange={e=>setProjects(ps=>ps.map(x=>x.id===p.id?{...x,name:e.target.value}:x))} onBlur={()=>setEditingProjectId(null)} onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingProjectId(null)}} onClick={e=>e.stopPropagation()} style={{flex:1,padding:"2px 6px",fontSize:13,fontWeight:600,border:"1px solid #6366f1",borderRadius:4,outline:"none",background:"#fff"}}/>:<div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div>}<span style={{fontSize:11,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
+                  if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:11,color:"#6b7280"}}>{row.count}</span></div>)}
                   const t=row.task;const m=teamMembers.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);const pName=row.project?.name||"";const isDraggingTask=dragTaskId===t.id;
                   return(<div key={"t-"+t.id} draggable onDragStart={e=>{e.stopPropagation();setDragTaskId(t.id);setDragTaskFromProjId(row.project?.id)}} onDragEnd={()=>{if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null);setDragOverProjId(null)}} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{}),opacity:isDraggingTask?0.5:1,cursor:"grab"}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                     {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
@@ -2255,7 +2255,7 @@ export default function App() {
                   return(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"4px 2px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>
                     {zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>
                     :<React.Fragment>
-                      <span style={{fontSize:10,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{col.width>20?col.label:""}</span>
+                      <span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{col.width>20?col.label:""}</span>
                       {cap&&col.width>=40&&<div style={{width:"calc(100% - 8px)",height:10,background:"#e5e7eb",borderRadius:2,overflow:"hidden",position:"relative"}} title={`${cap.workload}h / ${cap.capacity}h (${cap.util}%)`}>
                         <div style={{position:"absolute",left:0,top:0,bottom:0,width:Math.min(100,cap.util)+"%",background:capColor,borderRadius:2,transition:"width 0.3s"}}/>
                         {col.width>=60&&<span style={{position:"absolute",left:"50%",top:0,transform:"translateX(-50%)",fontSize:8,fontWeight:600,color:cap.util>50?"#fff":"#6b7280",lineHeight:"10px"}}>{cap.util}%</span>}
@@ -2307,7 +2307,7 @@ export default function App() {
                     const estRatio=hasEst?Math.min(1,(t.estimatedHours/8)/barDays):1;
                     const filledW=hasEst?Math.max(4,width*estRatio):width;
                     return(<div key={"gr-"+t.id} style={{display:"flex",position:"relative",height:36}}>
-                      {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}><div style={ST.md(barColor,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name||"新規タスク"}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
+                      {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}><div style={ST.md(barColor,isSel)}/>{DW>=20&&<span style={{fontSize:11,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name||"新規タスク"}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
                       :(<div data-bar="1" data-taskid={t.id} data-projectid={row.project?.id} style={{...ST.bar(left,width,hasEst?barColor+"40":barColor,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&!depDrag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                         {hasEst&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:filledW,background:barColor,borderRadius:estRatio>=1?"5px":"5px 0 0 5px"}}/>}
                         <div style={ST.rh("l")} onMouseDown={e=>startDrag(e,t,"resize-left")}/>
@@ -2315,7 +2315,7 @@ export default function App() {
                         <div style={ST.rh("r")} onMouseDown={e=>startDrag(e,t,"resize-right")}/>
                         <div onMouseDown={e=>{e.stopPropagation();setDepDrag({fromTaskId:t.id,fromProjectId:row.project?.id,fromX:left+width,fromY:0,mouseX:e.clientX,mouseY:e.clientY})}} style={{position:"absolute",right:-6,top:"50%",transform:"translateY(-50%)",width:10,height:10,borderRadius:"50%",background:"#6366f1",border:"2px solid #fff",cursor:"crosshair",boxShadow:"0 1px 3px rgba(0,0,0,.2)",zIndex:10,opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"}/>
                       </div>)}
-                      {!isMs&&<span style={{position:"absolute",left:left+width+12,top:10,fontSize:10,color:"#9ca3af",whiteSpace:"nowrap",pointerEvents:"none"}}>{pName}</span>}
+                      {!isMs&&<span style={{position:"absolute",left:left+width+12,top:10,fontSize:11,color:"#9ca3af",whiteSpace:"nowrap",pointerEvents:"none"}}>{pName}</span>}
                     </div>);
                   })}
                 </div>
@@ -2328,13 +2328,13 @@ export default function App() {
           <div style={ST.cap}>
             <div style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                <div style={{padding:"4px 10px",borderRadius:6,fontSize:10,fontWeight:500,background:"#e5e7eb",color:"#1f2937"}}>{capMode==="day"?"日":capMode==="week"?"週":"月"}表示</div>
+                <div style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:500,background:"#e5e7eb",color:"#1f2937"}}>{capMode==="day"?"日":capMode==="week"?"週":"月"}表示</div>
               </div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <button style={{width:24,height:24,border:"1px solid #e5e7eb",borderRadius:4,background:"#fff",cursor:"pointer",fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setCapOffset(o=>o-1)}>{"◀"}</button>
                 <div style={{textAlign:"center"}}>
                   <div style={{fontSize:12,fontWeight:600,color:"#1f2937"}}>{capPeriod.label}のキャパシティ</div>
-                  <div style={{fontSize:10,color:"#6b7280",marginTop:2}}>{capPeriod.dateLabel}</div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{capPeriod.dateLabel}</div>
                 </div>
                 <button style={{width:24,height:24,border:"1px solid #e5e7eb",borderRadius:4,background:"#fff",cursor:"pointer",fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setCapOffset(o=>o+1)}>{"▶"}</button>
               </div>
@@ -2343,7 +2343,7 @@ export default function App() {
             <div style={{padding:"8px 16px",background:"#f9fafb",borderBottom:"1px solid #e5e7eb",fontSize:11,fontWeight:600,color:"#6b7280"}}>社内メンバー</div>
             {capData.filter(m=>m.type==="internal").map(m=>(
               <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:10,color:"#6b7280"}}>{m.role}</div></div></div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:11,color:"#6b7280"}}>{m.role}</div></div></div>
                 <div style={{height:6,background:"#e5e7eb",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
                 <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#4b5563"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#6b7280",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>タスクなし</div>}</div>
@@ -2353,7 +2353,7 @@ export default function App() {
               <div style={{padding:"8px 16px",background:"#f0f9ff",borderBottom:"1px solid #e5e7eb",fontSize:11,fontWeight:600,color:"#0ea5e9"}}>社外パートナー</div>
               {capData.filter(m=>m.type==="external").map(m=>(
                 <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color,border:"2px dashed #fff",boxShadow:"0 0 0 2px "+m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:10,color:"#6b7280"}}>{m.role}</div></div></div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color,border:"2px dashed #fff",boxShadow:"0 0 0 2px "+m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:11,color:"#6b7280"}}>{m.role}</div></div></div>
                   <div style={{height:6,background:"#e5e7eb",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
                   <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#4b5563"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#6b7280",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>タスクなし</div>}</div>
@@ -2400,7 +2400,7 @@ export default function App() {
             {!isMulti&&<button onClick={()=>{setOpenTid(ctxMenu.id);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 編集"}</button>}
             <button onClick={()=>duplicateTask(ctxMenu.id,ctxMenu.projectId,isMulti?targetIds:null)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 複製"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}</button>
             <div style={{position:"relative"}} onMouseEnter={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='block'} onMouseLeave={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='none'}>
-              <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"👤 担当変更"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}<span style={{fontSize:10,color:"#9ca3af",marginLeft:"auto"}}>{"▶"}</span></button>
+              <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"👤 担当変更"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}<span style={{fontSize:11,color:"#9ca3af",marginLeft:"auto"}}>{"▶"}</span></button>
               <div className="submenu-assignee" style={{display:"none",position:"absolute",left:"100%",top:0,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",minWidth:160,padding:4,marginLeft:4}}>
                 <button onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>targetIds.includes(t.id)?{...t,assignee:null}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,color:"#6b7280"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>未設定</button>
                 <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
@@ -2408,7 +2408,7 @@ export default function App() {
                   <button key={m.id} onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>targetIds.includes(t.id)?{...t,assignee:m.id}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff"}}>{m.av}</div>{m.name}</button>
                 ))}
                 <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
-                <div style={{padding:"4px 12px",fontSize:10,color:"#9ca3af"}}>社外</div>
+                <div style={{padding:"4px 12px",fontSize:11,color:"#9ca3af"}}>社外</div>
                 {teamMembers.filter(m=>m.type==="external").map(m=>(
                   <button key={m.id} onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>targetIds.includes(t.id)?{...t,assignee:m.id}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",border:"1px dashed #fff",boxShadow:"0 0 0 1px "+m.color}}>{m.av}</div>{m.name}</button>
                 ))}
@@ -2418,7 +2418,7 @@ export default function App() {
             {isMilestone?<button onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>t.id===ctxMenu.id?{...t,type:undefined,end:addDays(t.start,2)}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 タスクに変換"}</button>
             :<button onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>t.id===ctxMenu.id?{...t,type:"milestone",end:t.start}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"◆ マイルストーンに変換"}</button>}
             <div style={{position:"relative"}} onMouseEnter={e=>e.currentTarget.querySelector('.submenu').style.display='block'} onMouseLeave={e=>e.currentTarget.querySelector('.submenu').style.display='none'}>
-              <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📂 プロジェクト移動"}<span style={{fontSize:10,color:"#9ca3af"}}>{"▶"}</span></button>
+              <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📂 プロジェクト移動"}<span style={{fontSize:11,color:"#9ca3af"}}>{"▶"}</span></button>
               <div className="submenu" style={{display:"none",position:"absolute",left:"100%",top:0,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",minWidth:160,padding:4,marginLeft:4}}>
                 {projects.filter(p=>p.id!==ctxMenu.projectId).map(p=>(
                   <button key={p.id} onClick={()=>{setProjects(ps=>ps.map(proj=>{if(proj.id===ctxMenu.projectId)return{...proj,tasks:proj.tasks.filter(t=>t.id!==ctxMenu.id)};if(proj.id===p.id){const taskToMove=ps.flatMap(x=>x.tasks).find(t=>t.id===ctxMenu.id);return{...proj,tasks:[...proj.tasks,{...taskToMove,projectId:p.id,dependencies:[]}]};}return proj}));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{p.name}</button>
