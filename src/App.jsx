@@ -212,10 +212,10 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
 
 // Calendar - 週/月表示、月曜始まり、ドラッグ移動対応
 function CalView({ projects, setProjects, today, onOpen, members }) {
-  const [calMode, setCalMode] = useState("month"); // "week" or "month"
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [drag, setDrag] = useState(null); // {taskId, projectId, startX, origStart, origEnd}
-  const DN_MON = ["月", "火", "水", "木", "金", "土", "日"]; // 月曜始まり
+  const [calMode, setCalMode] = useState("month"); // "day" or "week" or "month"
+  const [offset, setOffset] = useState(0); // 日/週/月のオフセット
+  const [drag, setDrag] = useState(null);
+  const DN_MON = ["月", "火", "水", "木", "金", "土", "日"];
 
   const tasks = useMemo(() => {
     const arr = [];
@@ -223,7 +223,6 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
     return arr;
   }, [projects]);
 
-  // 月曜を取得
   const getMonday = (d) => {
     const date = new Date(d);
     const day = date.getDay();
@@ -232,16 +231,22 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
     return date;
   };
 
-  // 曜日インデックス（月曜=0, 日曜=6）
   const getDayIdx = (d) => {
     const day = d.getDay();
     return day === 0 ? 6 : day - 1;
   };
 
-  // 週表示用: 現在の週
+  // 現在表示中の日付（日表示用）
+  const currentDay = useMemo(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + offset);
+    return d;
+  }, [today, offset]);
+
+  // 現在表示中の週
   const currentWeek = useMemo(() => {
     const mon = getMonday(today);
-    mon.setDate(mon.getDate() + weekOffset * 7);
+    mon.setDate(mon.getDate() + offset * 7);
     const week = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(mon);
@@ -249,27 +254,50 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
       week.push(d);
     }
     return week;
-  }, [today, weekOffset]);
+  }, [today, offset]);
 
-  // 月表示用: 3ヶ月分の週を生成（月曜始まり）
+  // 現在表示中の月
+  const currentMonth = useMemo(() => {
+    const d = new Date(today);
+    d.setMonth(d.getMonth() + offset);
+    d.setDate(1);
+    return d;
+  }, [today, offset]);
+
+  // ヘッダーラベル
+  const headerLabel = useMemo(() => {
+    if (calMode === "day") {
+      const d = currentDay;
+      const dayName = DN_MON[getDayIdx(d)];
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${dayName}）`;
+    } else if (calMode === "week") {
+      const ws = currentWeek[0], we = currentWeek[6];
+      return `${ws.getMonth() + 1}/${ws.getDate()} 〜 ${we.getMonth() + 1}/${we.getDate()}`;
+    } else {
+      return `${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月`;
+    }
+  }, [calMode, currentDay, currentWeek, currentMonth]);
+
+  // 月表示用の週配列を生成
   const weeks = useMemo(() => {
+    if (calMode === "day") return [];
     if (calMode === "week") return [currentWeek];
-    const start = new Date(today);
-    start.setDate(1);
-    start.setMonth(start.getMonth() - 1);
-    const mon = getMonday(start);
-    const end = new Date(today);
-    end.setMonth(end.getMonth() + 2);
-    end.setDate(0);
+    // 月表示：その月の週を生成
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const mon = getMonday(firstDay);
     const ws = [];
     const c = new Date(mon);
-    while (c <= end) {
+    while (c <= lastDay || c.getDay() !== 1) {
       const week = [];
       for (let i = 0; i < 7; i++) { week.push(new Date(c)); c.setDate(c.getDate() + 1); }
       ws.push(week);
+      if (c > lastDay && c.getDay() === 1) break;
     }
     return ws;
-  }, [today, calMode, currentWeek]);
+  }, [calMode, currentWeek, currentMonth]);
 
   // 週ごとのタスクを計算
   const weekTasks = useMemo(() => {
@@ -339,68 +367,115 @@ function CalView({ projects, setProjects, today, onOpen, members }) {
   }, [drag, setProjects]);
 
   const ROW_H = calMode === "week" ? 28 : 22, ROW_GAP = 2, DATE_H = calMode === "week" ? 40 : 28;
-  const weekLabel = currentWeek[0].getMonth() + 1 + "/" + currentWeek[0].getDate() + " 〜 " + (currentWeek[6].getMonth() + 1) + "/" + currentWeek[6].getDate();
+  const goToday = () => setOffset(0);
+  const goPrev = () => setOffset(o => o - 1);
+  const goNext = () => setOffset(o => o + 1);
+  const changeMode = (mode) => { setCalMode(mode); setOffset(0); };
+
+  // 日表示用：その日のタスク
+  const dayTasks = useMemo(() => {
+    if (calMode !== "day") return [];
+    return tasks.filter(t => {
+      const ts = new Date(t.start), te = new Date(t.end);
+      ts.setHours(0,0,0,0); te.setHours(0,0,0,0);
+      const cd = new Date(currentDay); cd.setHours(0,0,0,0);
+      return ts <= cd && te >= cd;
+    });
+  }, [calMode, tasks, currentDay]);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#f8f7f4", overflow: "hidden" }}>
-      {/* ヘッダー: モード切替 */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", background: "#fff", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button onClick={() => setCalMode("week")} style={{ padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 4, background: calMode === "week" ? "#6366f1" : "#fff", color: calMode === "week" ? "#fff" : "#4b5563", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>週</button>
-          <button onClick={() => setCalMode("month")} style={{ padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 4, background: calMode === "month" ? "#6366f1" : "#fff", color: calMode === "month" ? "#fff" : "#4b5563", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>月</button>
+      {/* ヘッダー */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: "#fff", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
+        {/* 左: ナビゲーション */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={goPrev} style={{ width: 28, height: 28, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563" }}>{"‹"}</button>
+          <button onClick={goToday} style={{ padding: "6px 14px", border: "1px solid #e5e7eb", borderRadius: 6, background: offset === 0 ? "#6366f1" : "#fff", color: offset === 0 ? "#fff" : "#4b5563", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>今日</button>
+          <button onClick={goNext} style={{ width: 28, height: 28, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563" }}>{"›"}</button>
+          <span style={{ marginLeft: 12, fontSize: 14, fontWeight: 600, color: "#1f2937" }}>{headerLabel}</span>
         </div>
-        {calMode === "week" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => setWeekOffset(o => o - 1)} style={{ width: 24, height: 24, border: "1px solid #e5e7eb", borderRadius: 4, background: "#fff", cursor: "pointer", fontSize: 11 }}>{"◀"}</button>
-            <span style={{ fontSize: 12, fontWeight: 500, minWidth: 100, textAlign: "center" }}>{weekLabel}</span>
-            <button onClick={() => setWeekOffset(o => o + 1)} style={{ width: 24, height: 24, border: "1px solid #e5e7eb", borderRadius: 4, background: "#fff", cursor: "pointer", fontSize: 11 }}>{"▶"}</button>
-            <button onClick={() => setWeekOffset(0)} style={{ padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: 4, background: "#fff", cursor: "pointer", fontSize: 10, marginLeft: 8 }}>今週</button>
+        {/* 右: 日/週/月 切り替え */}
+        <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 6, overflow: "hidden" }}>
+          {["day", "week", "month"].map((mode, i) => (
+            <button key={mode} onClick={() => changeMode(mode)} style={{ padding: "6px 16px", border: "none", borderLeft: i > 0 ? "1px solid #e5e7eb" : "none", background: calMode === mode ? "#ef4444" : "#fff", color: calMode === mode ? "#fff" : "#4b5563", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+              {mode === "day" ? "日" : mode === "week" ? "週" : "月"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* 日表示 */}
+      {calMode === "day" && (
+        <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e5e7eb", minHeight: 400 }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", background: same(currentDay, today) ? "rgba(99,102,241,.06)" : "#f9fafb" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{dayTasks.length}件のタスク</span>
+            </div>
+            <div style={{ padding: 8 }}>
+              {dayTasks.length === 0 && <div style={{ padding: 32, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>この日のタスクはありません</div>}
+              {dayTasks.map(t => {
+                const mem = members.find(m => m.id === t.assignee);
+                const barColor = mem?.color || "#9ca3af";
+                return (
+                  <div key={t.id} onClick={() => onOpen(t)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", marginBottom: 8, background: barColor + "10", borderLeft: `4px solid ${barColor}`, borderRadius: 6, cursor: "pointer" }}>
+                    {mem && <div style={{ width: 28, height: 28, borderRadius: "50%", background: barColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#fff" }}>{mem.av}</div>}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937", textDecoration: t.done ? "line-through" : "none", opacity: t.done ? 0.5 : 1 }}>{t.name}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>{t.projectName}</div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{fmtD(t.start)} 〜 {fmtD(t.end)}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
-      {/* 曜日ヘッダー */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", background: "#fff", flexShrink: 0 }}>
-        {DN_MON.map((d, i) => <div key={d} style={{ padding: calMode === "week" ? 12 : 10, textAlign: "center", fontSize: 11, fontWeight: 600, color: i >= 5 ? "#9ca3af" : "#6b7280" }}>{d}</div>)}
-      </div>
-      <div style={{ flex: 1, overflow: "auto" }} ref={scrollRef}>
-        {weeks.map((week, wi) => {
-          const firstOfMonth = calMode === "month" ? week.find(d => d.getDate() === 1) : null;
-          const rows = weekTasks[wi] || [];
-          const contentH = calMode === "week" ? Math.max(rows.length * (ROW_H + ROW_GAP) + 16, 200) : Math.max(rows.length * (ROW_H + ROW_GAP) + 8, 60);
-          return (
-            <React.Fragment key={wi}>
-              {firstOfMonth && <div style={{ padding: "8px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 13, fontWeight: 600, color: "#1f2937", position: "sticky", top: 0, zIndex: 5 }}>{firstOfMonth.getFullYear()}年 {MN[firstOfMonth.getMonth()]}</div>}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", position: "relative", minHeight: calMode === "week" ? "calc(100vh - 160px)" : undefined }}>
-                {week.map((d, di) => {
-                  const isT = same(d, today);
-                  const isWeekend = di >= 5;
-                  return (
-                    <div key={di} style={{ minHeight: DATE_H + contentH, background: isT ? "rgba(99,102,241,.06)" : (isWeekend ? "#f9fafb" : "#fff"), borderRight: di < 6 ? "1px solid #f3f4f6" : "none" }}>
-                      <div style={{ padding: calMode === "week" ? "8px 10px" : "4px 6px", height: DATE_H, display: "flex", alignItems: calMode === "week" ? "flex-start" : "center", flexDirection: calMode === "week" ? "column" : "row" }}>
-                        <div style={isT ? { color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#6366f1", borderRadius: "50%", fontSize: 12 } : { fontSize: calMode === "week" ? 14 : 12, fontWeight: 500, color: "#4b5563" }}>{d.getDate()}</div>
-                        {calMode === "week" && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{MN[d.getMonth()]}</div>}
+        </div>
+      )}
+      {/* 週/月表示 */}
+      {calMode !== "day" && (
+        <React.Fragment>
+          {/* 曜日ヘッダー */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", background: "#fff", flexShrink: 0 }}>
+            {DN_MON.map((d, i) => <div key={d} style={{ padding: calMode === "week" ? 12 : 10, textAlign: "center", fontSize: 11, fontWeight: 600, color: i >= 5 ? "#9ca3af" : "#6b7280" }}>{d}</div>)}
+          </div>
+          <div style={{ flex: 1, overflow: "auto" }} ref={scrollRef}>
+            {weeks.map((week, wi) => {
+              const rows = weekTasks[wi] || [];
+              const contentH = calMode === "week" ? Math.max(rows.length * (ROW_H + ROW_GAP) + 16, 200) : Math.max(rows.length * (ROW_H + ROW_GAP) + 8, 60);
+              return (
+                <div key={wi} style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", position: "relative", minHeight: calMode === "week" ? "calc(100vh - 160px)" : undefined }}>
+                  {week.map((d, di) => {
+                    const isT = same(d, today);
+                    const isWeekend = di >= 5;
+                    const isCurrentMonth = calMode === "month" && d.getMonth() === currentMonth.getMonth();
+                    return (
+                      <div key={di} style={{ minHeight: DATE_H + contentH, background: isT ? "rgba(239,68,68,.08)" : (isWeekend ? "#f9fafb" : "#fff"), borderRight: di < 6 ? "1px solid #f3f4f6" : "none", opacity: calMode === "month" && !isCurrentMonth ? 0.4 : 1 }}>
+                        <div style={{ padding: calMode === "week" ? "8px 10px" : "4px 6px", height: DATE_H, display: "flex", alignItems: calMode === "week" ? "flex-start" : "center", flexDirection: calMode === "week" ? "column" : "row", gap: 4 }}>
+                          {calMode === "month" && d.getDate() === 1 && <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 500 }}>{d.getMonth() + 1}月</span>}
+                          <div style={isT ? { color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#ef4444", borderRadius: "50%", fontSize: 12 } : { fontSize: calMode === "week" ? 14 : 12, fontWeight: 500, color: "#4b5563" }}>{d.getDate()}</div>
+                          {calMode === "week" && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{MN[d.getMonth()]}</div>}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-                {/* タスクバー */}
-                {rows.map((row, ri) => row.map(t => {
-                  const mem = members.find(m => m.id === t.assignee);
-                  const barColor = mem?.color || "#9ca3af";
-                  const left = `calc(${t.startDay} * 100% / 7 + 4px)`;
-                  const width = `calc(${t.span} * 100% / 7 - 8px)`;
-                  const isDragging = drag?.taskId === t.id;
-                  return (
-                    <div key={t.id + "-" + wi} onMouseDown={(e) => handleDragStart(e, t, week[0])} onClick={() => !drag && onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: calMode === "week" ? 11 : 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: isDragging ? "grabbing" : "grab", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: isDragging ? "0 4px 12px rgba(0,0,0,.2)" : "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: isDragging ? 10 : 2, transform: isDragging ? "scale(1.02)" : "none" }}>
-                      {mem && <span style={{ marginRight: 4, opacity: 0.9 }}>{mem.av}</span>}{t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
-                    </div>
-                  );
-                }))}
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
+                    );
+                  })}
+                  {/* タスクバー */}
+                  {rows.map((row, ri) => row.map(t => {
+                    const mem = members.find(m => m.id === t.assignee);
+                    const barColor = mem?.color || "#9ca3af";
+                    const left = `calc(${t.startDay} * 100% / 7 + 4px)`;
+                    const width = `calc(${t.span} * 100% / 7 - 8px)`;
+                    const isDragging = drag?.taskId === t.id;
+                    return (
+                      <div key={t.id + "-" + wi} onMouseDown={(e) => handleDragStart(e, t, week[0])} onClick={() => !drag && onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: calMode === "week" ? 11 : 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: isDragging ? "grabbing" : "grab", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: isDragging ? "0 4px 12px rgba(0,0,0,.2)" : "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: isDragging ? 10 : 2, transform: isDragging ? "scale(1.02)" : "none" }}>
+                        {mem && <span style={{ marginRight: 4, opacity: 0.9 }}>{mem.av}</span>}{t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
+                      </div>
+                    );
+                  }))}
+                </div>
+              );
+            })}
+          </div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
