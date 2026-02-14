@@ -1260,7 +1260,7 @@ export default function App() {
   }, [importText, importProjectName]);
 
   // Drag
-  const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end),projectId:t.projectId}}));setDrag({task,type:type||"move",startX:e.clientX,startY:e.clientY,active,od});setDragShift(0)},[selIds,projects]);
+  const startDrag = useCallback((e,task,type)=>{if(e.button!==0)return;e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end),projectId:t.projectId}}));setDrag({task,type:type||"move",startX:e.clientX,startY:e.clientY,active,od});setDragShift(0)},[selIds,projects]);
   useEffect(()=>{if(!drag)return;
     // 依存関係で連動するタスクを取得
     const getDependentTasks = (taskIds, allTasks) => {
