@@ -215,6 +215,7 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
   const [calMode, setCalMode] = useState("month"); // "day" or "week" or "month"
   const [offset, setOffset] = useState(0); // 日/週/月のオフセット（日・週表示用）
   const [monthRange, setMonthRange] = useState({ start: -2, end: 4 }); // 月表示用：相対月範囲
+  const [monthOffset, setMonthOffset] = useState(0); // 月表示用：現在表示中の月オフセット
   const [drag, setDrag] = useState(null);
   const DN_MON = ["月", "火", "水", "木", "金", "土", "日"];
 
@@ -283,9 +284,12 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
       const ws = currentWeek[0], we = currentWeek[6];
       return `${ws.getMonth() + 1}/${ws.getDate()} 〜 ${we.getMonth() + 1}/${we.getDate()}`;
     } else {
-      return `${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月`;
+      // 月表示用：monthOffsetを使用
+      const d = new Date(today);
+      d.setMonth(d.getMonth() + monthOffset);
+      return `${d.getFullYear()}年${d.getMonth() + 1}月`;
     }
-  }, [calMode, currentDay, currentWeek, currentMonth]);
+  }, [calMode, currentDay, currentWeek, today, monthOffset]);
 
   // 月表示用の週配列を生成（複数月対応）
   const weeksData = useMemo(() => {
@@ -410,20 +414,57 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
   }, [drag, setProjects]);
 
   const ROW_H = calMode === "week" ? 28 : 22, ROW_GAP = 2, DATE_H = calMode === "week" ? 40 : 28;
+
+  const scrollToMonth = useCallback((targetOffset) => {
+    if (scrollRef.current) {
+      const targetWeekIdx = weeksData.findIndex(w => w.monthOffset === targetOffset && w.isFirstWeekOfMonth);
+      if (targetWeekIdx >= 0) {
+        // 月ヘッダーの高さ(44px)も考慮してスクロール位置を計算
+        let scrollPos = 0;
+        for (let i = 0; i < targetWeekIdx; i++) {
+          scrollPos += 140; // 週の高さ
+          if (weeksData[i].isFirstWeekOfMonth) scrollPos += 44; // 月ヘッダーの高さ
+        }
+        scrollRef.current.scrollTo({ top: scrollPos, behavior: "smooth" });
+      }
+    }
+  }, [weeksData]);
+
   const goToday = () => {
     if (calMode === "month") {
-      // 月表示では今日の位置にスクロール
-      if (scrollRef.current) {
-        const todayWeekIdx = weeks.findIndex(w => w.some(d => same(d, today)));
-        if (todayWeekIdx >= 0) scrollRef.current.scrollTo({ top: todayWeekIdx * 140 - 100, behavior: "smooth" });
-      }
+      setMonthOffset(0);
+      scrollToMonth(0);
     } else {
       setOffset(0);
     }
   };
-  const goPrev = () => setOffset(o => o - 1);
-  const goNext = () => setOffset(o => o + 1);
-  const changeMode = (mode) => { setCalMode(mode); setOffset(0); initialScrollDone.current = false; };
+  const goPrev = () => {
+    if (calMode === "month") {
+      const newOffset = monthOffset - 1;
+      // 範囲を拡張する必要があるかチェック
+      if (newOffset < monthRange.start) {
+        setMonthRange(r => ({ ...r, start: r.start - 2 }));
+      }
+      setMonthOffset(newOffset);
+      setTimeout(() => scrollToMonth(newOffset), 50);
+    } else {
+      setOffset(o => o - 1);
+    }
+  };
+  const goNext = () => {
+    if (calMode === "month") {
+      const newOffset = monthOffset + 1;
+      // 範囲を拡張する必要があるかチェック
+      if (newOffset > monthRange.end) {
+        setMonthRange(r => ({ ...r, end: r.end + 2 }));
+      }
+      setMonthOffset(newOffset);
+      setTimeout(() => scrollToMonth(newOffset), 50);
+    } else {
+      setOffset(o => o + 1);
+    }
+  };
+  const changeMode = (mode) => { setCalMode(mode); setOffset(0); setMonthOffset(0); initialScrollDone.current = false; };
 
   // 日表示用：その日のタスク
   const dayTasks = useMemo(() => {
@@ -442,11 +483,10 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: "#fff", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
         {/* 左: ナビゲーション */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {calMode !== "month" && <button onClick={goPrev} style={{ width: 28, height: 28, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563" }}>{"‹"}</button>}
+          <button onClick={goPrev} style={{ width: 28, height: 28, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563" }}>{"‹"}</button>
           <button onClick={goToday} style={{ padding: "6px 14px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#6366f1", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>今日</button>
-          {calMode !== "month" && <button onClick={goNext} style={{ width: 28, height: 28, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563" }}>{"›"}</button>}
-          {calMode !== "month" && <span style={{ marginLeft: 12, fontSize: 14, fontWeight: 600, color: "#1f2937" }}>{headerLabel}</span>}
-          {calMode === "month" && <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>スクロールで月を移動</span>}
+          <button onClick={goNext} style={{ width: 28, height: 28, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563" }}>{"›"}</button>
+          <span style={{ marginLeft: 12, fontSize: 14, fontWeight: 600, color: "#1f2937" }}>{headerLabel}</span>
         </div>
         {/* 右: 日/週/月 切り替え */}
         <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 6, overflow: "hidden" }}>
