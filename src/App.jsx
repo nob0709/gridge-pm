@@ -924,6 +924,7 @@ export default function App() {
   // 前回保存時の状態を追跡（削除検知用）
   const prevProjectIdsRef = useRef(new Set());
   const prevTaskIdsRef = useRef(new Set());
+  const prevMemberIdsRef = useRef(new Set());
   const dbLoadedRef = useRef(false);
 
   // Load data from Supabase
@@ -940,6 +941,31 @@ export default function App() {
         .from('tasks')
         .select('*');
       if (tError) throw tError;
+
+      // メンバーを読み込み
+      const { data: membersData, error: mError } = await supabase
+        .from('members')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (mError) throw mError;
+
+      // メンバーデータがあればセット、なければデフォルトのTEAMを使用
+      if (membersData && membersData.length > 0) {
+        const mappedMembers = membersData.map(m => ({
+          id: m.id,
+          name: m.name,
+          role: m.role || '',
+          color: m.color || '#6366f1',
+          hpw: m.hpw || 40,
+          av: m.av || m.name.slice(0, 1),
+          type: m.type || 'internal',
+        }));
+        setTeamMembers(mappedMembers);
+        prevMemberIdsRef.current = new Set(mappedMembers.map(m => m.id));
+      } else {
+        // DBにメンバーがない場合はデフォルトTEAMを使用し、IDを記録
+        prevMemberIdsRef.current = new Set(TEAM.map(m => m.id));
+      }
 
       if (projectsData.length === 0 && tasksData.length === 0) {
         // DBが本当に空の場合のみデモデータ（初回セットアップ）
@@ -1080,9 +1106,43 @@ export default function App() {
         }
       }
 
+      // メンバーを保存
+      const currentMemberIds = new Set(teamMembers.map(m => m.id));
+      const deletedMemberIds = [...prevMemberIdsRef.current].filter(id => !currentMemberIds.has(id));
+
+      // 削除されたメンバーをDBから削除
+      if (deletedMemberIds.length > 0) {
+        console.log('Deleting members:', deletedMemberIds);
+        const { error } = await supabase.from('members').delete().in('id', deletedMemberIds);
+        if (error) console.error('Member delete error:', error);
+      }
+
+      // メンバーをupsert
+      const membersToUpsert = teamMembers.map((m, i) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role || '',
+        color: m.color || '#6366f1',
+        hpw: m.hpw || 40,
+        av: m.av || m.name.slice(0, 1),
+        type: m.type || 'internal',
+        sort_order: i,
+      }));
+      if (membersToUpsert.length > 0) {
+        console.log('Upserting members:', membersToUpsert.length);
+        const { error: mError } = await supabase
+          .from('members')
+          .upsert(membersToUpsert, { onConflict: 'id' });
+        if (mError) {
+          console.error('Member upsert error:', mError);
+          throw mError;
+        }
+      }
+
       // 保存成功したら現在のIDを記録
       prevProjectIdsRef.current = currentProjectIds;
       prevTaskIdsRef.current = currentTaskIds;
+      prevMemberIdsRef.current = currentMemberIds;
       console.log('Save completed successfully');
 
     } catch (err) {
@@ -1091,7 +1151,7 @@ export default function App() {
       // 保存エラー時はローカルデータは維持（ユーザーの作業を失わない）
     }
     setSaving(false);
-  }, [projects]);
+  }, [projects, teamMembers]);
 
   // Load on mount
   useEffect(() => {
@@ -1112,7 +1172,7 @@ export default function App() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [projects, saveToDB]);
+  }, [projects, teamMembers, saveToDB]);
 
   const openTask = useMemo(()=>{if(!openTid)return null;for(const p of projects)for(const t of p.tasks)if(t.id===openTid)return{task:t,project:p.name,projectTasks:p.tasks};return null},[openTid,projects]);
 
