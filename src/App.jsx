@@ -702,19 +702,59 @@ export default function App() {
     setCtxMenu(null);
   }, [projects]);
 
-  // Delete task
+  // Delete task(s) - 複数選択対応
   const deleteTask = useCallback((taskId, projectId) => {
-    const proj = projects.find(p => p.id === projectId);
-    const task = proj?.tasks.find(t => t.id === taskId);
-    setDelConfirm({ type: 'task', id: taskId, projectId, name: task?.name || 'タスク' });
+    // 複数選択されている場合は全て削除対象にする
+    if (selIds.size > 1 && selIds.has(taskId)) {
+      // 選択中のタスク情報を収集
+      const taskInfos = [];
+      projects.forEach(p => {
+        p.tasks.forEach(t => {
+          if (selIds.has(t.id)) {
+            taskInfos.push({ id: t.id, projectId: p.id, name: t.name });
+          }
+        });
+      });
+      setDelConfirm({ type: 'tasks', taskIds: Array.from(selIds), taskInfos, count: selIds.size });
+    } else {
+      const proj = projects.find(p => p.id === projectId);
+      const task = proj?.tasks.find(t => t.id === taskId);
+      setDelConfirm({ type: 'task', id: taskId, projectId, name: task?.name || 'タスク' });
+    }
     setCtxMenu(null);
-  }, [projects]);
+  }, [projects, selIds]);
+
+  // Delete selected tasks (Deleteキー用)
+  const deleteSelectedTasks = useCallback(() => {
+    if (selIds.size === 0) return;
+    const taskInfos = [];
+    projects.forEach(p => {
+      p.tasks.forEach(t => {
+        if (selIds.has(t.id)) {
+          taskInfos.push({ id: t.id, projectId: p.id, name: t.name });
+        }
+      });
+    });
+    if (taskInfos.length === 1) {
+      setDelConfirm({ type: 'task', id: taskInfos[0].id, projectId: taskInfos[0].projectId, name: taskInfos[0].name || 'タスク' });
+    } else if (taskInfos.length > 1) {
+      setDelConfirm({ type: 'tasks', taskIds: taskInfos.map(t => t.id), taskInfos, count: taskInfos.length });
+    }
+  }, [projects, selIds]);
 
   // Execute delete confirmation
   const confirmDelete = useCallback(() => {
     if (!delConfirm) return;
     if (delConfirm.type === 'project') {
       setProjects(ps => ps.filter(p => p.id !== delConfirm.id));
+    } else if (delConfirm.type === 'tasks') {
+      // 複数タスク削除
+      const idsToDelete = new Set(delConfirm.taskIds);
+      setProjects(ps => ps.map(p => ({
+        ...p,
+        tasks: p.tasks.filter(t => !idsToDelete.has(t.id))
+      })));
+      setSelIds(new Set()); // 選択解除
     } else {
       setProjects(ps => ps.map(p =>
         p.id === delConfirm.projectId ? { ...p, tasks: p.tasks.filter(t => t.id !== delConfirm.id) } : p
@@ -877,7 +917,10 @@ export default function App() {
 
   const initialScrollRef=useRef(false);
   useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
-  useEffect(()=>{const h=e=>{if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid]);
+  useEffect(()=>{const h=e=>{
+    if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}
+    if((e.key==="Delete"||e.key==="Backspace")&&selIds.size>0&&!openTid&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();deleteSelectedTasks()}
+  };window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid,selIds,deleteSelectedTasks]);
   // グローバルクリックでドロップダウンを閉じる
   useEffect(()=>{if(!showAddMenu)return;const h=()=>setShowAddMenu(false);setTimeout(()=>window.addEventListener("click",h),0);return()=>window.removeEventListener("click",h)},[showAddMenu]);
 
@@ -1030,7 +1073,7 @@ export default function App() {
                   {mActive&&mRect&&mRect.width>3&&<div style={{position:"absolute",border:"1.5px dashed #6366f1",background:"rgba(99,102,241,.06)",zIndex:20,pointerEvents:"none",borderRadius:3,left:mRect.left,top:mRect.top,width:mRect.width,height:mRect.height}}/>}
                   {rowList.map(row=>{
                     if(row.type==="project"||row.type==="member")return<div key={"gr-"+(row.project?.id||row.member?.id)} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
-                    const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=right-left;
+                    const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=Math.max(4,right-left-1);
                     const ph=PH[t.phase]||{c:"#666"};const isMs=t.type==="milestone";const mem=TEAM.find(x=>x.id===t.assignee);
                     const barColor=mem?.color||"#9ca3af"; // 担当者の色、未設定はグレー
                     const isSel=selIds.has(t.id);const isDrg=drag&&drag.active&&drag.active.has(t.id);
@@ -1178,12 +1221,12 @@ export default function App() {
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
             <div style={{width:40,height:40,borderRadius:"50%",background:"#fef2f2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{"🗑"}</div>
             <div>
-              <div style={{fontSize:16,fontWeight:600,color:"#1f2937"}}>{delConfirm.type==="project"?"案件を削除":"タスクを削除"}</div>
-              <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>{delConfirm.name||"無題"}</div>
+              <div style={{fontSize:16,fontWeight:600,color:"#1f2937"}}>{delConfirm.type==="project"?"案件を削除":delConfirm.type==="tasks"?delConfirm.count+"件のタスクを削除":"タスクを削除"}</div>
+              <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>{delConfirm.type==="tasks"?delConfirm.taskInfos.slice(0,3).map(t=>t.name||"無題").join("、")+(delConfirm.count>3?" 他"+(delConfirm.count-3)+"件":""):delConfirm.name||"無題"}</div>
             </div>
           </div>
           <p style={{fontSize:13,color:"#6b7280",marginBottom:20,lineHeight:1.6}}>
-            {delConfirm.type==="project"?"この案件とすべてのタスクが削除されます。":"このタスクが削除されます。"}この操作は取り消せません。
+            {delConfirm.type==="project"?"この案件とすべてのタスクが削除されます。":delConfirm.type==="tasks"?delConfirm.count+"件のタスクが削除されます。":"このタスクが削除されます。"}この操作は取り消せません。
           </p>
           <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
             <button onClick={()=>setDelConfirm(null)} style={{padding:"10px 20px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:500,color:"#374151"}}>キャンセル</button>
