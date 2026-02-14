@@ -67,7 +67,7 @@ Vite + React で構築。現在は単一ファイル（src/App.jsx）のフロ�
 ## デプロイ
 - **Vercel** を使用（`npx vercel --prod`）
 - GitHubにプッシュ後、手動でデプロイが必要
-- 本番URL: https://gridge-pm.vercel.app （または最新のVercel URL）
+- 本番URL: https://gridge-pm.vercel.app
 
 ## ワークロード計算ルール
 - デフォルト: 土日はカウントしない（平日のみ）
