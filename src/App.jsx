@@ -225,9 +225,9 @@ function CalView({ projects, setProjects, today, onOpen, members, filterA, filte
       .filter(p => !filterS || p.status === filterS)
       .forEach(p => p.tasks
         .filter(t => {
-          if (!filterA) return true;
-          if (filterA === "unassigned") return !t.assignee;
-          return t.assignee === filterA;
+          if (!filterA || filterA.size === 0) return true;
+          if (filterA.has("unassigned") && !t.assignee) return true;
+          return filterA.has(t.assignee);
         })
         .forEach(t => arr.push({ ...t, projectName: p.name, projectId: p.id })));
     return arr;
@@ -1069,7 +1069,7 @@ export default function App() {
   const canRedo = historyIndex < historyRef.current.length - 1;
   const [view, setView] = useState("gantt");
   const [dayWidth, setDayWidth] = useState(DEFAULT_DW);
-  const [filterA, setFilterA] = useState(null);
+  const [filterA, setFilterA] = useState(new Set()); // 複数選択対応
   const [filterS, setFilterS] = useState(null);
   const [showCap, setShowCap] = useState(true);
   const [capMode, setCapMode] = useState("week"); // "day" or "week" or "month" - zoomLevelに連動
@@ -1551,7 +1551,7 @@ export default function App() {
   const getPos = useCallback(date=>{const dt=new Date(date);dt.setHours(0,0,0,0);return diffD(dateRange[0],dt)*DW},[dateRange,DW]);
   const todayPos = useMemo(()=>getPos(today),[getPos,today]);
 
-  const filtered = useMemo(()=>projects.map(p=>({...p,tasks:p.tasks.filter(t=>{if(!filterA)return true;if(filterA==="unassigned")return !t.assignee;return t.assignee===filterA})})).filter(p=>{if(filterS&&p.status!==filterS)return false;if(filterA&&p.tasks.length===0)return false;return true}),[projects,filterA,filterS]);
+  const filtered = useMemo(()=>projects.map(p=>({...p,tasks:p.tasks.filter(t=>{if(filterA.size===0)return true;if(filterA.has("unassigned")&&!t.assignee)return true;return filterA.has(t.assignee)})})).filter(p=>{if(filterS&&p.status!==filterS)return false;if(filterA.size>0&&p.tasks.length===0)return false;return true}),[projects,filterA,filterS]);
   const togProj = useCallback(id=>setProjects(p=>p.map(x=>x.id===id?{...x,collapsed:!x.collapsed}:x)),[]);
   const selectAll = useCallback(()=>{const a=new Set();filtered.forEach(p=>p.tasks.forEach(t=>a.add(t.id)));setSelIds(a)},[filtered]);
 
@@ -2318,30 +2318,30 @@ export default function App() {
 
       <div style={ST.fbar}>
         <span style={{fontSize:11,color:"#6b7280",marginRight:4}}>担当:</span>
-        <button style={ST.chip(!filterA)} onClick={()=>setFilterA(null)}>全員</button>
-        {teamMembers.filter(m=>m.type==="internal").map(m=><button key={m.id} style={ST.chip(filterA===m.id,m.color)} onClick={()=>setFilterA(filterA===m.id?null:m.id)}>{m.name}</button>)}
+        <button style={ST.chip(filterA.size===0)} onClick={()=>setFilterA(new Set())}>全員</button>
+        {teamMembers.filter(m=>m.type==="internal").map(m=><button key={m.id} style={ST.chip(filterA.has(m.id),m.color)} onClick={()=>setFilterA(prev=>{const n=new Set(prev);if(n.has(m.id))n.delete(m.id);else n.add(m.id);return n})}>{m.name}</button>)}
         <div style={{width:1,height:20,background:"#e5e7eb",margin:"0 4px"}}/>
         <div style={{position:"relative"}}>
           <button
-            style={{...ST.chip(teamMembers.some(m=>m.type==="external"&&filterA===m.id),"#0ea5e9"),borderStyle:"dashed",display:"flex",alignItems:"center",gap:4}}
+            style={{...ST.chip(teamMembers.some(m=>m.type==="external"&&filterA.has(m.id)),"#0ea5e9"),borderStyle:"dashed",display:"flex",alignItems:"center",gap:4}}
             onClick={()=>setShowExtDropdown(!showExtDropdown)}
           >
-            {teamMembers.find(m=>m.type==="external"&&filterA===m.id)?.name||"社外"}
+            {(()=>{const sel=teamMembers.filter(m=>m.type==="external"&&filterA.has(m.id));return sel.length>0?sel.map(m=>m.name).join(", "):"社外"})()}
             <span style={{fontSize:8,transform:showExtDropdown?"rotate(180deg)":"none",transition:"transform 0.2s"}}>▼</span>
           </button>
           {showExtDropdown&&<div style={{position:"absolute",top:"100%",left:0,marginTop:4,background:"#fff",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",border:"1px solid #e5e7eb",zIndex:100,minWidth:140,overflow:"hidden"}}>
             {teamMembers.filter(m=>m.type==="external").map(m=>
-              <button key={m.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",width:"100%",border:"none",background:filterA===m.id?"rgba(14,165,233,.1)":"transparent",cursor:"pointer",fontSize:12,color:"#374151",textAlign:"left"}} onClick={()=>{setFilterA(filterA===m.id?null:m.id);setShowExtDropdown(false)}}>
+              <button key={m.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",width:"100%",border:"none",background:filterA.has(m.id)?"rgba(14,165,233,.1)":"transparent",cursor:"pointer",fontSize:12,color:"#374151",textAlign:"left"}} onClick={()=>{setFilterA(prev=>{const n=new Set(prev);if(n.has(m.id))n.delete(m.id);else n.add(m.id);return n})}}>
                 <div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:600,color:"#fff"}}>{m.av}</div>
                 <span style={{flex:1}}>{m.name}</span>
-                {filterA===m.id&&<span style={{color:"#0ea5e9",fontSize:10}}>✓</span>}
+                {filterA.has(m.id)&&<span style={{color:"#0ea5e9",fontSize:10}}>✓</span>}
               </button>
             )}
             {teamMembers.filter(m=>m.type==="external").length===0&&<div style={{padding:"10px 14px",fontSize:11,color:"#9ca3af"}}>社外メンバーなし</div>}
           </div>}
         </div>
         <div style={{width:1,height:20,background:"#e5e7eb",margin:"0 4px"}}/>
-        <button style={{...ST.chip(filterA==="unassigned","#9ca3af"),borderStyle:"dotted"}} onClick={()=>setFilterA(filterA==="unassigned"?null:"unassigned")}>未確定</button>
+        <button style={{...ST.chip(filterA.has("unassigned"),"#9ca3af"),borderStyle:"dotted"}} onClick={()=>setFilterA(prev=>{const n=new Set(prev);if(n.has("unassigned"))n.delete("unassigned");else n.add("unassigned");return n})}>未確定</button>
         <div style={{width:1,height:20,background:"#e5e7eb"}}/>
         <span style={{fontSize:11,color:"#6b7280",marginRight:4}}>状態:</span>
         <button style={ST.chip(!filterS)} onClick={()=>setFilterS(null)}>すべて</button>
