@@ -1723,16 +1723,19 @@ export default function App() {
             <button style={ST.tab(view==="kanban")} onClick={()=>setView("kanban")}>{"▣ カンバン"}</button>
             <button style={ST.tab(view==="list")} onClick={()=>setView("list")}>{"≡ リスト"}</button>
           </div>
-          {isGL&&<div style={{display:"flex",alignItems:"center",gap:8,marginLeft:8}}>
-            <button onClick={()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-20)}} style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:500,cursor:"pointer",border:"1px solid #6366f1",background:"rgba(99,102,241,.08)",color:"#6366f1"}}>{"📍 今日"}</button>
-            <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:6,padding:2}}>{presets.map(p=><button key={p.l} style={{padding:"4px 8px",borderRadius:4,fontSize:10,fontWeight:500,cursor:"pointer",color:Math.abs(dayWidth-p.dw)<1?"#1f2937":"#6b7280",border:"none",background:Math.abs(dayWidth-p.dw)<1?"#e5e7eb":"transparent"}} onClick={()=>setDayWidth(p.dw)}>{p.l}</button>)}</div>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:11,color:"#6b7280",cursor:"pointer"}} onClick={()=>setDayWidth(clamp(DW*0.7,MIN_DW,MAX_DW))}>{"−"}</span>
-              <input type="range" min={Math.log(MIN_DW)} max={Math.log(MAX_DW)} step={0.01} value={Math.log(DW)} onChange={e=>setDayWidth(Math.exp(parseFloat(e.target.value)))} style={{width:80,accentColor:"#6366f1",cursor:"pointer"}}/>
-              <span style={{fontSize:11,color:"#6b7280",cursor:"pointer"}} onClick={()=>setDayWidth(clamp(DW*1.4,MIN_DW,MAX_DW))}>{"＋"}</span>
-              <span style={{fontSize:10,color:"#6b7280",minWidth:24}}>{getZLbl(DW)}</span>
+          {isGL&&<React.Fragment>
+            <button onClick={()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-ganttRef.current.clientWidth/2)}} style={{marginLeft:12,padding:"6px 14px",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",boxShadow:"0 1px 3px rgba(99,102,241,.3)"}}>{"📍 今日"}</button>
+            <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:8,padding:3,marginLeft:8}}>
+              <button style={{...ST.tab(zoomLevel==="day"),fontSize:11}} onClick={()=>setDayWidth(40)}>日</button>
+              <button style={{...ST.tab(zoomLevel==="week"),fontSize:11}} onClick={()=>setDayWidth(16)}>週</button>
+              <button style={{...ST.tab(zoomLevel==="month"),fontSize:11}} onClick={()=>setDayWidth(5)}>月</button>
             </div>
-          </div>}
+            <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:8}}>
+              <span style={{fontSize:13,color:"#6b7280",cursor:"pointer",padding:"2px 6px",borderRadius:4}} onClick={()=>setDayWidth(clamp(DW*0.7,MIN_DW,MAX_DW))} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"−"}</span>
+              <input type="range" min={Math.log(MIN_DW)} max={Math.log(MAX_DW)} step={0.01} value={Math.log(DW)} onChange={e=>setDayWidth(Math.exp(parseFloat(e.target.value)))} style={{width:60,accentColor:"#6366f1",cursor:"pointer"}}/>
+              <span style={{fontSize:13,color:"#6b7280",cursor:"pointer",padding:"2px 6px",borderRadius:4}} onClick={()=>setDayWidth(clamp(DW*1.4,MIN_DW,MAX_DW))} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋"}</span>
+            </div>
+          </React.Fragment>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button style={{...ST.btnI,...(showCap?{background:"rgba(99,102,241,.08)",borderColor:"#6366f1",color:"#6366f1"}:{})}} onClick={()=>setShowCap(!showCap)}>{"👥"}</button>
