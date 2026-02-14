@@ -2006,7 +2006,7 @@ export default function App() {
   },[!!depDrag]);
 
   const initialScrollRef=useRef(false);
-  useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-20)},100)}},[todayPos]);
+  useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos)},100)}},[todayPos]);
   useEffect(()=>{const h=e=>{
     if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}
     if((e.key==="Delete"||e.key==="Backspace")&&selIds.size>0&&!openTid&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();deleteSelectedTasks()}
@@ -2272,7 +2272,7 @@ export default function App() {
             <button style={ST.tab(view==="list")} onClick={()=>setView("list")}>{"≡ リスト"}</button>
           </div>
           {isGL&&<React.Fragment>
-            <button onClick={()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-ganttRef.current.clientWidth/2)}} style={{marginLeft:12,padding:"6px 14px",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",boxShadow:"0 1px 3px rgba(99,102,241,.3)"}}>{"📍 今日"}</button>
+            <button onClick={()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos)}} style={{marginLeft:12,padding:"6px 14px",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid #6366f1",background:"#6366f1",color:"#fff",boxShadow:"0 1px 3px rgba(99,102,241,.3)"}}>{"📍 今日"}</button>
             <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:8,padding:3,marginLeft:8}}>
               <button style={{...ST.tab(zoomLevel==="day"),fontSize:11}} onClick={()=>setDayWidth(40)}>日</button>
               <button style={{...ST.tab(zoomLevel==="week"),fontSize:11}} onClick={()=>setDayWidth(16)}>週</button>
