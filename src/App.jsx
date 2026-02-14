@@ -962,24 +962,33 @@ export default function App() {
     setDelConfirm(null);
   }, [delConfirm]);
 
-  // Duplicate task
-  const duplicateTask = useCallback((taskId, projectId) => {
-    setProjects(ps => ps.map(p => {
-      if (p.id !== projectId) return p;
-      const task = p.tasks.find(t => t.id === taskId);
-      if (!task) return p;
-      const newTask = {
-        ...task,
-        id: "t" + Date.now(),
-        name: task.name + " (コピー)",
-        done: false,
-        dependencies: [], // 依存関係はリセット
-      };
-      const idx = p.tasks.findIndex(t => t.id === taskId);
-      const newTasks = [...p.tasks];
-      newTasks.splice(idx + 1, 0, newTask);
-      return { ...p, tasks: newTasks };
-    }));
+  // Duplicate task(s) - 複数選択対応
+  const duplicateTask = useCallback((taskId, projectId, targetIds = null) => {
+    // targetIdsが渡された場合は複数複製
+    const idsTodup = targetIds || [taskId];
+
+    setProjects(ps => {
+      // 各プロジェクトごとに処理
+      return ps.map(p => {
+        const tasksInProj = p.tasks.filter(t => idsTodup.includes(t.id));
+        if (tasksInProj.length === 0) return p;
+
+        const newTasks = [...p.tasks];
+        // 各タスクを複製（逆順で挿入して順序を保持）
+        tasksInProj.reverse().forEach(task => {
+          const newTask = {
+            ...task,
+            id: "t" + Date.now() + Math.random().toString(36).substr(2, 5),
+            name: task.name + " (コピー)",
+            done: false,
+            dependencies: [],
+          };
+          const idx = newTasks.findIndex(t => t.id === task.id);
+          newTasks.splice(idx + 1, 0, newTask);
+        });
+        return { ...p, tasks: newTasks };
+      });
+    });
     setCtxMenu(null);
   }, []);
 
@@ -1840,7 +1849,7 @@ export default function App() {
             {isMulti&&<div style={{padding:"6px 12px",fontSize:11,fontWeight:600,color:"#6366f1",background:"rgba(99,102,241,.08)",borderRadius:4,marginBottom:4}}>{targetIds.length}件選択中</div>}
             <button onClick={()=>{const newId=ctxMenu.projectId+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.projectId,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.projectId?{...p,tasks:[...p.tasks,newTask]}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
             {!isMulti&&<button onClick={()=>{setOpenTid(ctxMenu.id);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 編集"}</button>}
-            {!isMulti&&<button onClick={()=>duplicateTask(ctxMenu.id,ctxMenu.projectId)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 複製"}</button>}
+            <button onClick={()=>duplicateTask(ctxMenu.id,ctxMenu.projectId,isMulti?targetIds:null)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 複製"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}</button>
             <div style={{position:"relative"}} onMouseEnter={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='block'} onMouseLeave={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='none'}>
               <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"👤 担当変更"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}<span style={{fontSize:10,color:"#9ca3af",marginLeft:"auto"}}>{"▶"}</span></button>
               <div className="submenu-assignee" style={{display:"none",position:"absolute",left:"100%",top:0,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",minWidth:160,padding:4,marginLeft:4}}>
