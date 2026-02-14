@@ -2006,7 +2006,7 @@ export default function App() {
   },[!!depDrag]);
 
   const initialScrollRef=useRef(false);
-  useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
+  useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-20)},100)}},[todayPos]);
   useEffect(()=>{const h=e=>{
     if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}
     if((e.key==="Delete"||e.key==="Backspace")&&selIds.size>0&&!openTid&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();deleteSelectedTasks()}
