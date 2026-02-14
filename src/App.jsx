@@ -210,32 +210,67 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
   );
 }
 
-// Calendar - 縦スクロール・バー表示（日をまたいで表示）
-function CalView({ projects, today, onOpen }) {
+// Calendar - 週/月表示、月曜始まり、ドラッグ移動対応
+function CalView({ projects, setProjects, today, onOpen }) {
+  const [calMode, setCalMode] = useState("month"); // "week" or "month"
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [drag, setDrag] = useState(null); // {taskId, projectId, startX, origStart, origEnd}
+  const DN_MON = ["月", "火", "水", "木", "金", "土", "日"]; // 月曜始まり
+
   const tasks = useMemo(() => {
     const arr = [];
-    projects.forEach(p => p.tasks.forEach(t => arr.push({ ...t, projectName: p.name })));
+    projects.forEach(p => p.tasks.forEach(t => arr.push({ ...t, projectName: p.name, projectId: p.id })));
     return arr;
   }, [projects]);
-  // 3ヶ月分の週を生成
+
+  // 月曜を取得
+  const getMonday = (d) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    date.setDate(date.getDate() + diff);
+    return date;
+  };
+
+  // 曜日インデックス（月曜=0, 日曜=6）
+  const getDayIdx = (d) => {
+    const day = d.getDay();
+    return day === 0 ? 6 : day - 1;
+  };
+
+  // 週表示用: 現在の週
+  const currentWeek = useMemo(() => {
+    const mon = getMonday(today);
+    mon.setDate(mon.getDate() + weekOffset * 7);
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      week.push(d);
+    }
+    return week;
+  }, [today, weekOffset]);
+
+  // 月表示用: 3ヶ月分の週を生成（月曜始まり）
   const weeks = useMemo(() => {
+    if (calMode === "week") return [currentWeek];
     const start = new Date(today);
     start.setDate(1);
     start.setMonth(start.getMonth() - 1);
-    const sd = start.getDay();
-    start.setDate(start.getDate() - sd);
+    const mon = getMonday(start);
     const end = new Date(today);
     end.setMonth(end.getMonth() + 2);
     end.setDate(0);
     const ws = [];
-    const c = new Date(start);
+    const c = new Date(mon);
     while (c <= end) {
       const week = [];
       for (let i = 0; i < 7; i++) { week.push(new Date(c)); c.setDate(c.getDate() + 1); }
       ws.push(week);
     }
     return ws;
-  }, [today]);
+  }, [today, calMode, currentWeek]);
+
   // 週ごとのタスクを計算
   const weekTasks = useMemo(() => {
     return weeks.map(week => {
@@ -247,11 +282,10 @@ function CalView({ projects, today, onOpen }) {
       }).map(t => {
         const ts = new Date(t.start), te = new Date(t.end);
         ts.setHours(0,0,0,0); te.setHours(0,0,0,0);
-        const startDay = ts < ws ? 0 : ts.getDay();
-        const endDay = te > we ? 6 : te.getDay();
+        const startDay = ts < ws ? 0 : getDayIdx(ts);
+        const endDay = te > we ? 6 : getDayIdx(te);
         return { ...t, startDay, endDay, span: endDay - startDay + 1 };
       });
-      // 行の割り当て（重ならないように）
       const rows = [];
       wt.forEach(t => {
         let placed = false;
@@ -264,34 +298,87 @@ function CalView({ projects, today, onOpen }) {
       return rows;
     });
   }, [weeks, tasks]);
+
   const scrollRef = useRef(null);
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && calMode === "month") {
       const todayWeekIdx = weeks.findIndex(w => w.some(d => same(d, today)));
       if (todayWeekIdx > 0) scrollRef.current.scrollTop = todayWeekIdx * 140 - 100;
     }
-  }, [weeks, today]);
-  const ROW_H = 22, ROW_GAP = 2, DATE_H = 28;
+  }, [weeks, today, calMode]);
+
+  // ドラッグでタスク移動
+  const handleDragStart = (e, t, weekStart) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+    setDrag({ taskId: t.id, projectId: t.projectId, startX: e.clientX, cellWidth: rect.width / 7, origStart: new Date(t.start), origEnd: new Date(t.end), weekStart });
+  };
+
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e) => {
+      const dx = e.clientX - drag.startX;
+      const dayShift = Math.round(dx / drag.cellWidth);
+      if (dayShift === 0) return;
+      setProjects(ps => ps.map(p => ({
+        ...p,
+        tasks: p.tasks.map(t => {
+          if (t.id !== drag.taskId) return t;
+          const newStart = new Date(drag.origStart);
+          const newEnd = new Date(drag.origEnd);
+          newStart.setDate(newStart.getDate() + dayShift);
+          newEnd.setDate(newEnd.getDate() + dayShift);
+          return { ...t, start: newStart, end: newEnd };
+        })
+      })));
+    };
+    const onUp = () => setDrag(null);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, [drag, setProjects]);
+
+  const ROW_H = calMode === "week" ? 28 : 22, ROW_GAP = 2, DATE_H = calMode === "week" ? 40 : 28;
+  const weekLabel = currentWeek[0].getMonth() + 1 + "/" + currentWeek[0].getDate() + " 〜 " + (currentWeek[6].getMonth() + 1) + "/" + currentWeek[6].getDate();
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#f8f7f4", overflow: "hidden" }}>
+      {/* ヘッダー: モード切替 */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", background: "#fff", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={() => setCalMode("week")} style={{ padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 4, background: calMode === "week" ? "#6366f1" : "#fff", color: calMode === "week" ? "#fff" : "#4b5563", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>週</button>
+          <button onClick={() => setCalMode("month")} style={{ padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 4, background: calMode === "month" ? "#6366f1" : "#fff", color: calMode === "month" ? "#fff" : "#4b5563", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>月</button>
+        </div>
+        {calMode === "week" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => setWeekOffset(o => o - 1)} style={{ width: 24, height: 24, border: "1px solid #e5e7eb", borderRadius: 4, background: "#fff", cursor: "pointer", fontSize: 11 }}>{"◀"}</button>
+            <span style={{ fontSize: 12, fontWeight: 500, minWidth: 100, textAlign: "center" }}>{weekLabel}</span>
+            <button onClick={() => setWeekOffset(o => o + 1)} style={{ width: 24, height: 24, border: "1px solid #e5e7eb", borderRadius: 4, background: "#fff", cursor: "pointer", fontSize: 11 }}>{"▶"}</button>
+            <button onClick={() => setWeekOffset(0)} style={{ padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: 4, background: "#fff", cursor: "pointer", fontSize: 10, marginLeft: 8 }}>今週</button>
+          </div>
+        )}
+      </div>
+      {/* 曜日ヘッダー */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", background: "#fff", flexShrink: 0 }}>
-        {DN.map(d => <div key={d} style={{ padding: 10, textAlign: "center", fontSize: 11, fontWeight: 600, color: "#6b7280" }}>{d}</div>)}
+        {DN_MON.map((d, i) => <div key={d} style={{ padding: calMode === "week" ? 12 : 10, textAlign: "center", fontSize: 11, fontWeight: 600, color: i >= 5 ? "#9ca3af" : "#6b7280" }}>{d}</div>)}
       </div>
       <div style={{ flex: 1, overflow: "auto" }} ref={scrollRef}>
         {weeks.map((week, wi) => {
-          const firstOfMonth = week.find(d => d.getDate() === 1);
+          const firstOfMonth = calMode === "month" ? week.find(d => d.getDate() === 1) : null;
           const rows = weekTasks[wi] || [];
-          const contentH = Math.max(rows.length * (ROW_H + ROW_GAP) + 8, 60);
+          const contentH = calMode === "week" ? Math.max(rows.length * (ROW_H + ROW_GAP) + 16, 200) : Math.max(rows.length * (ROW_H + ROW_GAP) + 8, 60);
           return (
             <React.Fragment key={wi}>
               {firstOfMonth && <div style={{ padding: "8px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 13, fontWeight: 600, color: "#1f2937", position: "sticky", top: 0, zIndex: 5 }}>{firstOfMonth.getFullYear()}年 {MN[firstOfMonth.getMonth()]}</div>}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", position: "relative" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: "1px solid #e5e7eb", position: "relative", minHeight: calMode === "week" ? "calc(100vh - 160px)" : undefined }}>
                 {week.map((d, di) => {
                   const isT = same(d, today);
+                  const isWeekend = di >= 5;
                   return (
-                    <div key={di} style={{ minHeight: DATE_H + contentH, background: isT ? "rgba(99,102,241,.06)" : (isWE(d) ? "#f9fafb" : "#fff"), borderRight: di < 6 ? "1px solid #f3f4f6" : "none" }}>
-                      <div style={{ padding: "4px 6px", height: DATE_H, display: "flex", alignItems: "center" }}>
-                        <div style={isT ? { color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#6366f1", borderRadius: "50%", fontSize: 12 } : { fontSize: 12, fontWeight: 500, color: "#4b5563" }}>{d.getDate()}</div>
+                    <div key={di} style={{ minHeight: DATE_H + contentH, background: isT ? "rgba(99,102,241,.06)" : (isWeekend ? "#f9fafb" : "#fff"), borderRight: di < 6 ? "1px solid #f3f4f6" : "none" }}>
+                      <div style={{ padding: calMode === "week" ? "8px 10px" : "4px 6px", height: DATE_H, display: "flex", alignItems: calMode === "week" ? "flex-start" : "center", flexDirection: calMode === "week" ? "column" : "row" }}>
+                        <div style={isT ? { color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#6366f1", borderRadius: "50%", fontSize: 12 } : { fontSize: calMode === "week" ? 14 : 12, fontWeight: 500, color: "#4b5563" }}>{d.getDate()}</div>
+                        {calMode === "week" && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{MN[d.getMonth()]}</div>}
                       </div>
                     </div>
                   );
@@ -302,8 +389,9 @@ function CalView({ projects, today, onOpen }) {
                   const barColor = mem?.color || "#9ca3af";
                   const left = `calc(${t.startDay} * 100% / 7 + 4px)`;
                   const width = `calc(${t.span} * 100% / 7 - 8px)`;
+                  const isDragging = drag?.taskId === t.id;
                   return (
-                    <div key={t.id + "-" + wi} onClick={() => onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: "pointer", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: 2 }}>
+                    <div key={t.id + "-" + wi} onMouseDown={(e) => handleDragStart(e, t, week[0])} onClick={() => !drag && onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: calMode === "week" ? 11 : 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: isDragging ? "grabbing" : "grab", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: isDragging ? "0 4px 12px rgba(0,0,0,.2)" : "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: isDragging ? 10 : 2, transform: isDragging ? "scale(1.02)" : "none" }}>
                       {mem && <span style={{ marginRight: 4, opacity: 0.9 }}>{mem.av}</span>}{t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
                     </div>
                   );
@@ -1693,7 +1781,7 @@ export default function App() {
       </div>}
 
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-        {view==="calendar"?<CalView projects={projects} today={today} onOpen={t=>setOpenTid(t.id)}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:(
+        {view==="calendar"?<CalView projects={projects} setProjects={setProjects} today={today} onOpen={t=>setOpenTid(t.id)}/>:view==="kanban"?<KanbanView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:view==="list"?<ListView projects={projects} setProjects={setProjects} onOpen={t=>setOpenTid(t.id)}/>:(
           <React.Fragment>
             <div style={ST.side}>
               <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
