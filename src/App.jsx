@@ -565,6 +565,7 @@ export default function App() {
   const [showAddMenu, setShowAddMenu] = useState(false); // 右上の追加ボタンのドロップダウン
   const [showTaskModal, setShowTaskModal] = useState(false); // 新規タスク作成モーダル
   const [taskModalProjectId, setTaskModalProjectId] = useState(null); // タスク作成先のプロジェクトID
+  const [depDrag, setDepDrag] = useState(null); // 依存関係ドラッグ {fromTaskId, fromProjectId, mouseX, mouseY}
   const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
@@ -864,7 +865,26 @@ export default function App() {
 
   // Drag
   const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end)}}));setDrag({task,type:type||"move",startX:e.clientX,active,od});setDragShift(0)},[selIds,projects]);
-  useEffect(()=>{if(!drag)return;const onM=e=>{const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(!o)return t;if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}return t})})))};const onU=()=>{setDrag(null);setDragShift(0);setDragPos(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW]);
+  useEffect(()=>{if(!drag)return;
+    // 依存関係で連動するタスクを取得
+    const getDependentTasks = (taskIds, allTasks) => {
+      const result = new Set(taskIds);
+      let changed = true;
+      while(changed) {
+        changed = false;
+        allTasks.forEach(t => {
+          if(!result.has(t.id) && t.dependencies?.some(d => result.has(d))) {
+            result.add(t.id);
+            changed = true;
+          }
+        });
+      }
+      return result;
+    };
+    const allTasks = [];
+    projects.forEach(p => p.tasks.forEach(t => allTasks.push(t)));
+    const depTasks = drag.type==="move" ? getDependentTasks(Array.from(drag.active), allTasks) : new Set();
+    const onM=e=>{const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){return{...t,start:addDays(t.start,ds),end:addDays(t.end,ds)}}return t})})))};const onU=()=>{setDrag(null);setDragShift(0);setDragPos(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW,projects]);
 
   // Zoom - 非passiveリスナーでブラウザズームを無効化（Mac trackpad対応）
   const handleWheel = useCallback(e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const g=ganttRef.current;if(!g)return;const rect=g.getBoundingClientRect(),mx=e.clientX-rect.left,sl=g.scrollLeft,md=(sl+mx)/DW;const f=e.deltaY<0?1.15:0.87;const nDW=clamp(DW*f,MIN_DW,MAX_DW);setDayWidth(nDW);requestAnimationFrame(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=md*nDW-mx})},[DW]);
@@ -966,6 +986,33 @@ export default function App() {
     }
     setMActive(false);setMarquee(null);
   };window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[mActive,marquee,createTaskFromDrag]);
+
+  // 依存関係ドラッグ
+  useEffect(()=>{if(!depDrag)return;
+    const onM=e=>setDepDrag(prev=>prev?{...prev,mouseX:e.clientX,mouseY:e.clientY}:null);
+    const onU=e=>{
+      // ドロップ先のタスクを探す
+      const el=document.elementFromPoint(e.clientX,e.clientY);
+      const bar=el?.closest("[data-bar]");
+      if(bar){
+        const toTaskId=bar.getAttribute("data-taskid");
+        const toProjectId=bar.getAttribute("data-projectid");
+        if(toTaskId&&toTaskId!==depDrag.fromTaskId&&toProjectId===depDrag.fromProjectId){
+          // 依存関係を追加（toTaskがfromTaskに依存）
+          setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>{
+            if(t.id===toTaskId){
+              const deps=t.dependencies||[];
+              if(!deps.includes(depDrag.fromTaskId))return{...t,dependencies:[...deps,depDrag.fromTaskId]};
+            }
+            return t;
+          })})));
+        }
+      }
+      setDepDrag(null);
+    };
+    window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);
+    return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)};
+  },[depDrag]);
 
   const initialScrollRef=useRef(false);
   useEffect(()=>{if(!initialScrollRef.current&&ganttRef.current&&todayPos>0){initialScrollRef.current=true;setTimeout(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=Math.max(0,todayPos-300)},100)}},[todayPos]);
@@ -1176,11 +1223,12 @@ export default function App() {
                     const filledW=hasEst?Math.max(4,width*estRatio):width;
                     return(<div key={"gr-"+t.id} style={{display:"flex",position:"relative",height:36}}>
                       {isMs?(<div data-bar="1" style={{...ST.ms(left),...ds,top:10}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}><div style={ST.md(barColor,isSel)}/>{DW>=20&&<span style={{fontSize:10,fontWeight:500,color:"#4b5563",whiteSpace:"nowrap"}}>{t.done?"✓ ":""}{t.name||"新規タスク"}<span style={{color:"#9ca3af",marginLeft:12}}>{pName}</span></span>}</div>)
-                      :(<div data-bar="1" style={{...ST.bar(left,width,hasEst?barColor+"40":barColor,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
+                      :(<div data-bar="1" data-taskid={t.id} data-projectid={row.project?.id} style={{...ST.bar(left,width,hasEst?barColor+"40":barColor,isSel,isDrg),...ds,height:22,top:7,overflow:"visible"}} onMouseDown={e=>startDrag(e,t)} onClick={e=>{e.stopPropagation();toggleSel(t.id,e)}} onMouseEnter={e=>!drag&&!depDrag&&setTip({x:e.clientX,y:e.clientY,task:t,project:pName})} onMouseLeave={()=>setTip(null)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                         {hasEst&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:filledW,background:barColor,borderRadius:estRatio>=1?"5px":"5px 0 0 5px"}}/>}
                         <div style={ST.rh("l")} onMouseDown={e=>startDrag(e,t,"resize-left")}/>
                         {width>30&&<span style={{pointerEvents:"none",whiteSpace:"nowrap",position:"relative",zIndex:1}}>{t.done&&<span style={{marginRight:4}}>{"✓"}</span>}{mem&&view!=="timeline"&&<span style={{opacity:0.8,marginRight:4}}>{mem.av}</span>}{t.name||"新規タスク"}</span>}
                         <div style={ST.rh("r")} onMouseDown={e=>startDrag(e,t,"resize-right")}/>
+                        <div onMouseDown={e=>{e.stopPropagation();setDepDrag({fromTaskId:t.id,fromProjectId:row.project?.id,fromX:left+width,fromY:0,mouseX:e.clientX,mouseY:e.clientY})}} style={{position:"absolute",right:-6,top:"50%",transform:"translateY(-50%)",width:10,height:10,borderRadius:"50%",background:"#6366f1",border:"2px solid #fff",cursor:"crosshair",boxShadow:"0 1px 3px rgba(0,0,0,.2)",zIndex:10,opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"}/>
                       </div>)}
                       {!isMs&&<span style={{position:"absolute",left:left+width+12,top:10,fontSize:10,color:"#9ca3af",whiteSpace:"nowrap",pointerEvents:"none"}}>{pName}</span>}
                     </div>);
@@ -1326,6 +1374,12 @@ export default function App() {
           </div>
         </div>
       </React.Fragment>}
+
+      {depDrag&&<svg style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:2000}}>
+        <defs><marker id="arrowhead-drag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6366f1"/></marker></defs>
+        <line x1={depDrag.mouseX-((depDrag.mouseX-100)||0)*0.5} y1={depDrag.mouseY} x2={depDrag.mouseX} y2={depDrag.mouseY} stroke="#6366f1" strokeWidth="2" strokeDasharray="5,3" markerEnd="url(#arrowhead-drag)"/>
+        <circle cx={depDrag.mouseX} cy={depDrag.mouseY} r="6" fill="#6366f1" opacity="0.3"/>
+      </svg>}
     </div>
   );
 }
