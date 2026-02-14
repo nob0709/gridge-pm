@@ -1820,7 +1820,7 @@ export default function App() {
     const depTasks = depTasksRef.current;
     const depOriginal = depOriginalRef.current;
     let lastY=drag.startY;
-    const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){const depO=depOriginal[t.id];if(depO)return{...t,start:addDays(depO.start,ds),end:addDays(depO.end,ds)}}return t})})))};
+    const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds!==0){const depO=depOriginal[t.id];if(depO)return{...t,start:addDays(depO.start,ds),end:addDays(depO.end,ds)}}return t})})))};
     const onU=e=>{
       // Y軸方向の移動で別のプロジェクトに移動（複数タスク対応）
       // 最低10px以上のY移動があった場合のみプロジェクト移動を判定
