@@ -2139,17 +2139,22 @@ export default function App() {
       const periodCapacity=zoomLevel==="week"?totalWeeklyHours:Math.round(totalWeeklyHours*workDaysInPeriod/5);
 
       let totalWorkload=0;
+      const wStart=new Date(weekStart);wStart.setHours(0,0,0,0);
+      const wEnd=new Date(weekEnd);wEnd.setHours(23,59,59,999);
       internalTeam.forEach(m=>{
         projects.forEach(p=>p.tasks.forEach(t=>{
           if(t.assignee===m.id&&t.type!=="milestone"){
-            const s=new Date(t.start),e=new Date(t.end);
-            if(s<=weekEnd&&e>=weekStart){
-              const os=s>weekStart?s:weekStart,oe=e<weekEnd?e:weekEnd;
+            const s=new Date(t.start);s.setHours(0,0,0,0);
+            const e=new Date(t.end);e.setHours(23,59,59,999);
+            if(s<=wEnd&&e>=wStart){
+              const os=s>wStart?s:wStart,oe=e<wEnd?e:wEnd;
               let dInPeriod=0;
-              const cur=new Date(os);
-              while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              const cur=new Date(os);cur.setHours(12,0,0,0);
+              const oeNorm=new Date(oe);oeNorm.setHours(12,0,0,0);
+              while(cur<=oeNorm){if(t.includeWeekends||(cur.getDay()!==0&&cur.getDay()!==6))dInPeriod++;cur.setDate(cur.getDate()+1)}
               const totalDays=diffD(t.start,t.end)+1;
-              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              const workDaysRatio=t.includeWeekends?1:5/7;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*workDaysRatio)):dInPeriod*8;
               totalWorkload+=hours;
             }
           }
