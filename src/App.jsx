@@ -2500,6 +2500,10 @@ export default function App() {
             <div style={ST.side}>
               <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="dashboard"?"稼働状況":view==="timeline"?"メンバー別":"案件一覧"} ({view==="dashboard"?teamMembers.length+1:filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
+                {view==="gantt"&&showWorkloadOverview&&[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？",hpw:40}].map(m=>{
+                  const taskCount=projects.reduce((sum,p)=>sum+p.tasks.filter(t=>m.id==="unassigned"?!t.assignee:t.assignee===m.id).length,0);
+                  return(<div key={"wm-"+m.id} style={{...ST.prow(true),gap:8,position:"sticky",top:0,zIndex:10,background:"#fafafa"}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:11,color:"#6b7280"}}>{taskCount}</span></div>);
+                })}
                 {rowList.map(row=>{
                   if(row.type==="project"){const p=row.project;const isDragOver=(dragOverProjId===p.id&&dragProjId!==p.id)||(dragTaskId&&dragOverProjId===p.id&&dragTaskFromProjId!==p.id);const isEditing=editingProjectId===p.id;return(<div key={"p-"+p.id} draggable={!isEditing} onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null);if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject([dragTaskId],dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} onDoubleClick={()=>setEditingProjectId(p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>{isEditing?<input autoFocus value={p.name} onChange={e=>setProjects(ps=>ps.map(x=>x.id===p.id?{...x,name:e.target.value}:x))} onBlur={()=>setEditingProjectId(null)} onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingProjectId(null)}} onClick={e=>e.stopPropagation()} style={{flex:1,padding:"2px 6px",fontSize:13,fontWeight:600,border:"1px solid #6366f1",borderRadius:4,outline:"none",background:"#fff"}}/>:<div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div>}<span style={{fontSize:11,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
                   if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8,position:"sticky",top:0,zIndex:10}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:11,color:"#6b7280"}}>{row.count}</span></div>)}
@@ -2533,33 +2537,7 @@ export default function App() {
                   </div>);
                 })}</div>
               </div>
-              {view==="gantt"&&showWorkloadOverview&&(
-                <div style={{display:"flex",flexShrink:0,borderBottom:"1px solid #d1d5db",background:"#fafafa"}}>
-                  <div style={{width:200,minWidth:200,borderRight:"1px solid #e5e7eb",background:"#fff",flexShrink:0}}>
-                    {[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？"}].map(m=>(
-                      <div key={m.id} style={{height:28,padding:"0 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"1px solid #f3f4f6"}}>
-                        <div style={{width:18,height:18,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:600,color:"#fff",flexShrink:0}}>{m.av}</div>
-                        <span style={{fontSize:11,color:"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{flex:1,overflow:"hidden",position:"relative"}}>
-                    <div ref={workloadOverviewRef} style={{width:totalWidth,position:"relative",left:0}}>
-                      {[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？"}].map(m=>{
-                        const mw=memberWorkloads[m.id]||{};
-                        return(<div key={m.id} style={{height:28,position:"relative",borderBottom:"1px solid #f3f4f6",background:"#fafafa"}}>
-                          {Object.entries(mw).map(([key,w])=>{
-                            const barHeight=w.util>0?Math.max(4,Math.min(20,(w.util/100)*20)):0;
-                            const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
-                            return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:2,height:barHeight,background:capColor,opacity:0.7,borderRadius:"2px 2px 0 0"}} title={`${m.name}: ${w.workload}h / ${w.capacity}h (${w.util}%)`}/>);
-                          })}
-                        </div>);
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop;if(workloadOverviewRef.current)workloadOverviewRef.current.style.transform=`translateX(-${e.target.scrollLeft}px)`}}>
+                            <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop}}>
                 <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
                   {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
@@ -2574,6 +2552,20 @@ export default function App() {
                       return<path key={l.id} d={path} fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="4,2" markerEnd="url(#arrowhead)"/>;
                     })}
                   </svg>}
+                  {view==="gantt"&&showWorkloadOverview&&[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？",hpw:40}].map(m=>{
+                    const mw=memberWorkloads[m.id]||{};
+                    const maxUtil=Math.max(100,...Object.values(mw).map(w=>w.util||0));
+                    return(<div key={"gwm-"+m.id} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa",alignItems:"flex-end"}}>
+                      {Object.entries(mw).map(([key,w])=>{
+                        const barHeight=maxUtil>0?Math.max(2,(w.util/maxUtil)*32):0;
+                        const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
+                        return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:4,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                          <div style={{width:"calc(100% - 4px)",height:barHeight,background:capColor,opacity:0.6,borderRadius:"2px 2px 0 0"}} title={`${m.name}: ${w.workload}h / ${w.capacity}h (${w.util}%)`}/>
+                          {w.width>=50&&<span style={{fontSize:10,color:w.util>100?"#ef4444":w.util>80?"#f59e0b":"#6b7280",fontWeight:w.util>80?600:400}}>{w.workload}h</span>}
+                        </div>);
+                      })}
+                    </div>);
+                  })}
                   {rowList.map(row=>{
                     if(row.type==="project")return<div key={"gr-"+row.project?.id} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
                     if(row.type==="member"){
