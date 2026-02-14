@@ -111,7 +111,7 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
   const endRef = useRef(null);
   const mem = members.find(x => x.id === task.assignee);
   const ph = PH[task.phase] || { l:"?", c:"#666" };
-  const up = useCallback((f, v) => setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, [f]: v } : t) }))), [task.id, setProjects]);
+  const up = useCallback((f, v) => setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, [f]: v, updatedAt: new Date().toISOString() } : t) }))), [task.id, setProjects]);
   const otherTasks = projectTasks.filter(t => t.id !== task.id); // 自分以外のタスク
   // プロジェクト移動
   const moveToProject = useCallback((newProjectId) => {
@@ -164,6 +164,10 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
             <div><label style={lab}>終了日</label><input type="date" value={fmtISO(task.end)} onChange={e=>{if(e.target.value)up("end",new Date(e.target.value))}} style={inp}/></div>
           </div>
           <div style={{ fontSize:12, color:"#6b7280" }}>{diffD(task.start,task.end)+1}日間 ({fmtDF(task.start)} → {fmtDF(task.end)})</div>
+          {(task.createdAt||task.updatedAt)&&<div style={{ fontSize:11, color:"#9ca3af", display:"flex", gap:12 }}>
+            {task.createdAt&&<span>作成: {new Date(task.createdAt).toLocaleDateString("ja-JP")} {new Date(task.createdAt).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}</span>}
+            {task.updatedAt&&<span>更新: {new Date(task.updatedAt).toLocaleDateString("ja-JP")} {new Date(task.updatedAt).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}</span>}
+          </div>}
           {task.type!=="milestone"&&<div>
             <label style={lab}>見積もり工数</label>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -1500,6 +1504,8 @@ export default function App() {
             name: task.name + " (コピー)",
             done: false,
             dependencies: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: undefined,
           };
           const idx = newTasks.findIndex(t => t.id === task.id);
           newTasks.splice(idx + 1, 0, newTask);
@@ -1524,6 +1530,8 @@ export default function App() {
         id: "t" + Date.now() + Math.random().toString(36).substr(2, 5),
         done: false,
         dependencies: [], // 依存関係はリセット
+        createdAt: new Date().toISOString(),
+        updatedAt: undefined,
       })),
     };
     setProjects(ps => {
@@ -1924,7 +1932,7 @@ export default function App() {
     const newId=targetProj.id+"-"+Date.now();
     const startDate=new Date(clickedDate);
     const endDate=addDays(startDate,2);
-    const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
+    const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null,createdAt:new Date().toISOString()};
     setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
     setOpenTid(newId);
   },[view,rowList,DW,dateRange]);
@@ -1954,7 +1962,7 @@ export default function App() {
     if(!startDate||!endDate)return;
     // 新規タスク作成
     const newId=targetProj.id+"-"+Date.now();
-    const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:new Date(startDate),end:new Date(endDate),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
+    const newTask={id:newId,projectId:targetProj.id,name:"",phase:"wire",assignee:null,start:new Date(startDate),end:new Date(endDate),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null,createdAt:new Date().toISOString()};
     setProjects(ps=>ps.map(p=>p.id===targetProj.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));
     setOpenTid(newId);
   },[view,rowList,DW,dateRange]);
@@ -2679,7 +2687,7 @@ export default function App() {
         const adjustedX=ctxMenu.x+menuWidth>window.innerWidth?Math.max(8,window.innerWidth-menuWidth-8):ctxMenu.x;
         return<div style={{position:"fixed",left:adjustedX,top:adjustedY,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",zIndex:2000,minWidth:140,padding:4}}>
           {ctxMenu.type==="project"&&<React.Fragment>
-            <button onClick={()=>{const newId=ctxMenu.id+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.id,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
+            <button onClick={()=>{const newId=ctxMenu.id+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.id,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null,createdAt:new Date().toISOString()};setProjects(ps=>ps.map(p=>p.id===ctxMenu.id?{...p,tasks:[...p.tasks,newTask],collapsed:false}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
             <button onClick={()=>{setShowNewModal(true);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📁 プロジェクトを追加"}</button>
             <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
             <button onClick={()=>{const p=projects.find(x=>x.id===ctxMenu.id);if(p){const name=prompt('案件名を入力',p.name);if(name){setProjects(ps=>ps.map(x=>x.id===ctxMenu.id?{...x,name}:x))}}setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 名前を編集"}</button>
@@ -2762,7 +2770,7 @@ export default function App() {
                 const newId=p.id+"-"+Date.now();
                 const startDate=new Date(today);
                 const endDate=addDays(startDate,2);
-                const newTask={id:newId,projectId:p.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};
+                const newTask={id:newId,projectId:p.id,name:"",phase:"wire",assignee:null,start:startDate,end:endDate,done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null,createdAt:new Date().toISOString()};
                 setProjects(ps=>ps.map(proj=>proj.id===p.id?{...proj,tasks:[...proj.tasks,newTask],collapsed:false}:proj));
                 setOpenTid(newId);
                 setShowTaskModal(false);
