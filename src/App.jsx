@@ -1133,7 +1133,7 @@ export default function App() {
   const getPos = useCallback(date=>{const dt=new Date(date);dt.setHours(0,0,0,0);return diffD(dateRange[0],dt)*DW},[dateRange,DW]);
   const todayPos = useMemo(()=>getPos(today),[getPos,today]);
 
-  const filtered = useMemo(()=>projects.map(p=>({...p,tasks:p.tasks.filter(t=>!filterA||t.assignee===filterA)})).filter(p=>{if(filterS&&p.status!==filterS)return false;if(filterA&&p.tasks.length===0)return false;return true}),[projects,filterA,filterS]);
+  const filtered = useMemo(()=>projects.map(p=>({...p,tasks:p.tasks.filter(t=>{if(!filterA)return true;if(filterA==="unassigned")return !t.assignee;return t.assignee===filterA})})).filter(p=>{if(filterS&&p.status!==filterS)return false;if(filterA&&p.tasks.length===0)return false;return true}),[projects,filterA,filterS]);
   const togProj = useCallback(id=>setProjects(p=>p.map(x=>x.id===id?{...x,collapsed:!x.collapsed}:x)),[]);
   const selectAll = useCallback(()=>{const a=new Set();filtered.forEach(p=>p.tasks.forEach(t=>a.add(t.id)));setSelIds(a)},[filtered]);
 
@@ -1768,6 +1768,8 @@ export default function App() {
         <div style={{width:1,height:20,background:"#e5e7eb",margin:"0 4px"}}/>
         <span style={{fontSize:10,color:"#9ca3af",marginRight:4}}>社外:</span>
         {TEAM.filter(m=>m.type==="external").map(m=><button key={m.id} style={{...ST.chip(filterA===m.id,m.color),borderStyle:"dashed"}} onClick={()=>setFilterA(filterA===m.id?null:m.id)}>{m.name}</button>)}
+        <div style={{width:1,height:20,background:"#e5e7eb",margin:"0 4px"}}/>
+        <button style={{...ST.chip(filterA==="unassigned","#9ca3af"),borderStyle:"dotted"}} onClick={()=>setFilterA(filterA==="unassigned"?null:"unassigned")}>未確定</button>
         <div style={{width:1,height:20,background:"#e5e7eb"}}/>
         <span style={{fontSize:11,color:"#6b7280",marginRight:4}}>状態:</span>
         <button style={ST.chip(!filterS)} onClick={()=>setFilterS(null)}>すべて</button>
