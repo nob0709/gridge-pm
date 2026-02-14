@@ -2534,8 +2534,8 @@ export default function App() {
                 })}</div>
               </div>
               {view==="gantt"&&showWorkloadOverview&&(
-                <div style={{display:"flex",flexShrink:0,borderBottom:"1px solid #d1d5db",background:"#fafafa",maxHeight:180}}>
-                  <div style={{width:200,minWidth:200,borderRight:"1px solid #e5e7eb",background:"#fff",overflowY:"auto",flexShrink:0}}>
+                <div style={{display:"flex",flexShrink:0,borderBottom:"1px solid #d1d5db",background:"#fafafa"}}>
+                  <div style={{width:200,minWidth:200,borderRight:"1px solid #e5e7eb",background:"#fff",flexShrink:0}}>
                     {[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？"}].map(m=>(
                       <div key={m.id} style={{height:28,padding:"0 12px",display:"flex",alignItems:"center",gap:8,borderBottom:"1px solid #f3f4f6"}}>
                         <div style={{width:18,height:18,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:600,color:"#fff",flexShrink:0}}>{m.av}</div>
@@ -2543,18 +2543,15 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <div ref={workloadOverviewRef} style={{flex:1,overflowX:"auto",overflowY:"auto"}}>
-                    <div style={{width:totalWidth,position:"relative"}}>
+                  <div style={{flex:1,overflow:"hidden",position:"relative"}}>
+                    <div ref={workloadOverviewRef} style={{width:totalWidth,position:"relative",left:0}}>
                       {[...teamMembers,{id:"unassigned",name:"未確定",color:"#9ca3af",av:"？"}].map(m=>{
                         const mw=memberWorkloads[m.id]||{};
-                        const maxUtil=Math.max(100,...Object.values(mw).map(w=>w.util||0));
-                        return(<div key={m.id} style={{height:28,position:"relative",borderBottom:"1px solid #f3f4f6"}}>
+                        return(<div key={m.id} style={{height:28,position:"relative",borderBottom:"1px solid #f3f4f6",background:"#fafafa"}}>
                           {Object.entries(mw).map(([key,w])=>{
-                            const barHeight=maxUtil>0?Math.max(2,(w.util/maxUtil)*20):0;
+                            const barHeight=w.util>0?Math.max(4,Math.min(20,(w.util/100)*20)):0;
                             const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
-                            return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:2,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end"}}>
-                              <div style={{width:"calc(100% - 4px)",height:barHeight,background:capColor,opacity:0.7,borderRadius:"2px 2px 0 0"}} title={`${m.name}: ${w.workload}h / ${w.capacity}h (${w.util}%)`}/>
-                            </div>);
+                            return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:2,height:barHeight,background:capColor,opacity:0.7,borderRadius:"2px 2px 0 0"}} title={`${m.name}: ${w.workload}h / ${w.capacity}h (${w.util}%)`}/>);
                           })}
                         </div>);
                       })}
@@ -2562,7 +2559,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop;if(workloadOverviewRef.current)workloadOverviewRef.current.scrollLeft=e.target.scrollLeft}}>
+              <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop;if(workloadOverviewRef.current)workloadOverviewRef.current.style.transform=`translateX(-${e.target.scrollLeft}px)`}}>
                 <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
                   <div style={{position:"absolute",top:0,bottom:0,width:2,background:"#6366f1",zIndex:4,opacity:0.8,pointerEvents:"none",left:todayPos+DW/2}}/>
                   {zoomLevel==="day"&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",pointerEvents:"none"}}>{dateRange.map((d,i)=><div key={i} style={{width:DW,minWidth:DW,boxSizing:"border-box",borderRight:"1px solid #e5e7eb",background:isWE(d)?"#f9fafb":"transparent"}}/>)}</div>}
