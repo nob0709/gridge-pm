@@ -195,6 +195,11 @@ function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose
               <span style={{ fontSize:13, color:"#6b7280", flexShrink:0 }}>h</span>
             </div>
             {task.estimatedHours!=null&&<div style={{ fontSize:11, color:"#6366f1", marginTop:4 }}>{"⏱ 実工数: "+task.estimatedHours+"h / バー: "+(diffD(task.start,task.end)+1)+"日間（"+(diffD(task.start,task.end)+1)*8+"h）"}</div>}
+            <label style={{display:"flex",alignItems:"center",gap:8,marginTop:10,cursor:"pointer",fontSize:13,color:"#4b5563"}}>
+              <input type="checkbox" checked={task.includeWeekends||false} onChange={e=>up("includeWeekends",e.target.checked)} style={{width:16,height:16,cursor:"pointer",accentColor:"#6366f1"}}/>
+              土日も工数としてカウント
+            </label>
+            {task.includeWeekends&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>{"⚠ 土日を含めて工数計算されます"}</div>}
           </div>}
           <div>
             <label style={lab}>依存タスク（このタスクの前に完了が必要）</label>
@@ -2196,9 +2201,10 @@ export default function App() {
                 let dInPeriod=0;
                 const cur=new Date(os);cur.setHours(12,0,0,0);
                 const oeNorm=new Date(oe);oeNorm.setHours(12,0,0,0);
-                while(cur<=oeNorm){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+                while(cur<=oeNorm){if(t.includeWeekends||(cur.getDay()!==0&&cur.getDay()!==6))dInPeriod++;cur.setDate(cur.getDate()+1)}
                 const totalDays=diffD(t.start,t.end)+1;
-                const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+                const workDaysRatio=t.includeWeekends?1:5/7;
+                const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*workDaysRatio)):dInPeriod*8;
                 workload+=hours;
               }
             }
@@ -2223,9 +2229,10 @@ export default function App() {
               let dInPeriod=0;
               const cur=new Date(os);cur.setHours(12,0,0,0);
               const oeNorm=new Date(oe);oeNorm.setHours(12,0,0,0);
-              while(cur<=oeNorm){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              while(cur<=oeNorm){if(t.includeWeekends||(cur.getDay()!==0&&cur.getDay()!==6))dInPeriod++;cur.setDate(cur.getDate()+1)}
               const totalDays=diffD(t.start,t.end)+1;
-              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              const workDaysRatio=t.includeWeekends?1:5/7;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*workDaysRatio)):dInPeriod*8;
               workload+=hours;
             }
           }
@@ -2264,9 +2271,10 @@ export default function App() {
                 let dInPeriod=0;
                 const cur=new Date(os);cur.setHours(12,0,0,0);
                 const oeNorm=new Date(oe);oeNorm.setHours(12,0,0,0);
-                while(cur<=oeNorm){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+                while(cur<=oeNorm){if(t.includeWeekends||(cur.getDay()!==0&&cur.getDay()!==6))dInPeriod++;cur.setDate(cur.getDate()+1)}
                 const totalDays=diffD(t.start,t.end)+1;
-                const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+                const workDaysRatio=t.includeWeekends?1:5/7;
+                const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*workDaysRatio)):dInPeriod*8;
                 workload+=hours;
               }
             }
@@ -2312,9 +2320,10 @@ export default function App() {
               let dInPeriod=0;
               const cur=new Date(os);cur.setHours(12,0,0,0);
               const oeNorm=new Date(oe);oeNorm.setHours(12,0,0,0);
-              while(cur<=oeNorm){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              while(cur<=oeNorm){if(t.includeWeekends||(cur.getDay()!==0&&cur.getDay()!==6))dInPeriod++;cur.setDate(cur.getDate()+1)}
               const totalDays=diffD(t.start,t.end)+1;
-              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              const workDaysRatio=t.includeWeekends?1:5/7;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*workDaysRatio)):dInPeriod*8;
               workload+=hours;
             }
           }
