@@ -16,11 +16,16 @@ const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
 const timeNow = () => { const d = new Date(); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); };
 
 const TEAM = [
-  { id:"shimizu",name:"清水",role:"営業・全体統括",color:"#6366f1",hpw:40,av:"清" },
-  { id:"imashige",name:"今重",role:"コンテンツ・企画",color:"#f59e0b",hpw:40,av:"今" },
-  { id:"fujii",name:"藤井",role:"デザイン・撮影",color:"#10b981",hpw:40,av:"藤" },
-  { id:"nishitani",name:"西谷",role:"エンジニアリング",color:"#ef4444",hpw:40,av:"西" },
-  { id:"honda",name:"本田",role:"ディレクター(パート)",color:"#8b5cf6",hpw:20,av:"本" },
+  // 社内メンバー
+  { id:"shimizu",name:"清水",role:"営業・全体統括",color:"#6366f1",hpw:40,av:"清",type:"internal" },
+  { id:"imashige",name:"今重",role:"コンテンツ・企画",color:"#f59e0b",hpw:40,av:"今",type:"internal" },
+  { id:"fujii",name:"藤井",role:"デザイン・撮影",color:"#10b981",hpw:40,av:"藤",type:"internal" },
+  { id:"nishitani",name:"西谷",role:"エンジニアリング",color:"#ef4444",hpw:40,av:"西",type:"internal" },
+  { id:"honda",name:"本田",role:"ディレクター(パート)",color:"#8b5cf6",hpw:20,av:"本",type:"internal" },
+  { id:"nakata",name:"中田",role:"デザイン",color:"#ec4899",hpw:40,av:"中",type:"internal" },
+  // 社外メンバー
+  { id:"okada",name:"岡田",role:"プランナー",color:"#0ea5e9",hpw:20,av:"岡",type:"external" },
+  { id:"client",name:"クライアント",role:"お客様",color:"#64748b",hpw:0,av:"客",type:"external" },
 ];
 const PH = {
   sales:{l:"営業・ヒアリング",c:"#6366f1"},kickoff:{l:"キックオフ",c:"#8b5cf6"},wire:{l:"ワイヤーフレーム",c:"#f59e0b"},writing:{l:"ライティング",c:"#f97316"},design:{l:"デザイン",c:"#10b981"},photo:{l:"撮影",c:"#14b8a6"},coding:{l:"コーディング",c:"#ef4444"},test:{l:"テスト・検証",c:"#ec4899"},delivery:{l:"納品",c:"#06b6d4"},review:{l:"お客様確認",c:"#64748b"},ad:{l:"広告運用",c:"#7c3aed"},
@@ -101,13 +106,28 @@ const ST = {
 };
 
 // Task Detail Panel
-function TaskPanel({ task, project, projectTasks, setProjects, onClose }) {
+function TaskPanel({ task, project, projectTasks, projects, setProjects, onClose }) {
   const [comment, setComment] = useState("");
   const endRef = useRef(null);
   const mem = TEAM.find(x => x.id === task.assignee);
   const ph = PH[task.phase] || { l:"?", c:"#666" };
   const up = useCallback((f, v) => setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, [f]: v } : t) }))), [task.id, setProjects]);
   const otherTasks = projectTasks.filter(t => t.id !== task.id); // 自分以外のタスク
+  // プロジェクト移動
+  const moveToProject = useCallback((newProjectId) => {
+    if (newProjectId === task.projectId) return;
+    setProjects(ps => ps.map(p => {
+      if (p.id === task.projectId) {
+        // 元のプロジェクトからタスクを削除
+        return { ...p, tasks: p.tasks.filter(t => t.id !== task.id) };
+      }
+      if (p.id === newProjectId) {
+        // 新しいプロジェクトにタスクを追加
+        return { ...p, tasks: [...p.tasks, { ...task, projectId: newProjectId, dependencies: [] }] };
+      }
+      return p;
+    }));
+  }, [task, setProjects]);
   const addC = () => { if (!comment.trim()) return; const c = { id: Date.now(), text: comment.trim(), author: "shimizu", time: timeNow() }; setProjects(ps => ps.map(p => ({ ...p, tasks: p.tasks.map(t => t.id === task.id ? { ...t, comments: [...(t.comments||[]), c] } : t) }))); setComment(""); setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50); };
   const inp = { width:"100%", padding:"8px 10px", borderRadius:6, border:"1px solid #e5e7eb", background:"#fff", color:"#1f2937", fontSize:13, fontFamily:"inherit", outline:"none" };
   const sel = { ...inp, cursor:"pointer" };
@@ -129,6 +149,7 @@ function TaskPanel({ task, project, projectTasks, setProjects, onClose }) {
         </div>
         <div style={{ display:"grid", gap:16 }}>
           <div><label style={lab}>タスク名</label><input value={task.name} onChange={e=>up("name",e.target.value)} style={inp} autoFocus/></div>
+          <div><label style={lab}>プロジェクト</label><select value={task.projectId} onChange={e=>moveToProject(parseInt(e.target.value))} style={sel}>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div><label style={lab}>担当者</label>
             <div style={{ position:"relative" }}>
               <select value={task.assignee||""} onChange={e=>up("assignee",e.target.value||null)} style={sel}><option value="">未設定</option>{TEAM.map(m=><option key={m.id} value={m.id}>{m.name} - {m.role}</option>)}</select>
@@ -277,12 +298,13 @@ function CalView({ projects, today, onOpen }) {
                 })}
                 {/* タスクバー */}
                 {rows.map((row, ri) => row.map(t => {
-                  const ph = PH[t.phase] || { c: "#666" };
+                  const mem = TEAM.find(m => m.id === t.assignee);
+                  const barColor = mem?.color || "#9ca3af";
                   const left = `calc(${t.startDay} * 100% / 7 + 4px)`;
                   const width = `calc(${t.span} * 100% / 7 - 8px)`;
                   return (
-                    <div key={t.id + "-" + wi} onClick={() => onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: ph.c, color: "#fff", fontSize: 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: "pointer", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: 2 }}>
-                      {t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
+                    <div key={t.id + "-" + wi} onClick={() => onOpen(t)} style={{ position: "absolute", top: DATE_H + ri * (ROW_H + ROW_GAP) + 4, left, width, height: ROW_H, borderRadius: 4, background: barColor, color: "#fff", fontSize: 10, fontWeight: 500, padding: "0 6px", display: "flex", alignItems: "center", cursor: "pointer", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", boxShadow: "0 1px 2px rgba(0,0,0,.1)", opacity: t.done ? 0.5 : 1, zIndex: 2 }}>
+                      {mem && <span style={{ marginRight: 4, opacity: 0.9 }}>{mem.av}</span>}{t.name}<span style={{ marginLeft: 6, opacity: 0.7 }}>{t.projectName}</span>
                     </div>
                   );
                 }))}
@@ -538,16 +560,78 @@ function ListView({ projects, setProjects, onOpen }) {
 
 // Main
 export default function App() {
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjectsRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Undo/Redo履歴管理
+  const historyRef = useRef([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoRedoRef = useRef(false);
+  const MAX_HISTORY = 50;
+
+  // 履歴付きsetProjects
+  const setProjects = useCallback((updater) => {
+    setProjectsRaw(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Undo/Redo操作中は履歴に追加しない
+      if (!isUndoRedoRef.current && JSON.stringify(prev) !== JSON.stringify(next)) {
+        // 現在位置より後の履歴を削除（setHistoryIndexを使うため外で処理）
+        setTimeout(() => {
+          setHistoryIndex(idx => {
+            historyRef.current = historyRef.current.slice(0, idx + 1);
+            historyRef.current.push(JSON.parse(JSON.stringify(next)));
+            if (historyRef.current.length > MAX_HISTORY) {
+              historyRef.current.shift();
+              return idx;
+            } else {
+              return idx + 1;
+            }
+          });
+        }, 0);
+      }
+      return next;
+    });
+  }, []);
+
+  // Undo
+  const undo = useCallback(() => {
+    setHistoryIndex(idx => {
+      if (idx > 0) {
+        isUndoRedoRef.current = true;
+        const newIdx = idx - 1;
+        setProjectsRaw(JSON.parse(JSON.stringify(historyRef.current[newIdx])));
+        setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+        return newIdx;
+      }
+      return idx;
+    });
+  }, []);
+
+  // Redo
+  const redo = useCallback(() => {
+    setHistoryIndex(idx => {
+      if (idx < historyRef.current.length - 1) {
+        isUndoRedoRef.current = true;
+        const newIdx = idx + 1;
+        setProjectsRaw(JSON.parse(JSON.stringify(historyRef.current[newIdx])));
+        setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+        return newIdx;
+      }
+      return idx;
+    });
+  }, []);
+
+  // Undo/Redo可能かどうか
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < historyRef.current.length - 1;
   const [view, setView] = useState("gantt");
   const [dayWidth, setDayWidth] = useState(DEFAULT_DW);
   const [filterA, setFilterA] = useState(null);
   const [filterS, setFilterS] = useState(null);
   const [showCap, setShowCap] = useState(true);
-  const [capMode, setCapMode] = useState("week"); // "week" or "month"
-  const [capOffset, setCapOffset] = useState(0); // 0=今週/今月, 1=来週/来月, -1=先週/先月
+  const [capMode, setCapMode] = useState("week"); // "day" or "week" or "month" - zoomLevelに連動
+  const [capOffset, setCapOffset] = useState(0); // 0=今日/今週/今月, 1=明日/来週/来月, -1=昨日/先週/先月
   const [openTid, setOpenTid] = useState(null);
   const [tip, setTip] = useState(null);
   const [drag, setDrag] = useState(null);
@@ -560,16 +644,28 @@ export default function App() {
   const [lastSelId, setLastSelId] = useState(null);
   const [dragProjId, setDragProjId] = useState(null);
   const [dragOverProjId, setDragOverProjId] = useState(null);
+  const [dragTaskId, setDragTaskId] = useState(null); // サイドバーでタスクをドラッグ中
+  const [dragTaskFromProjId, setDragTaskFromProjId] = useState(null); // ドラッグ中のタスクの元プロジェクト
   const [ctxMenu, setCtxMenu] = useState(null); // {x, y, type: 'project'|'task', id, projectId?}
   const [delConfirm, setDelConfirm] = useState(null); // {type: 'project'|'task', id, projectId?, name}
   const [showAddMenu, setShowAddMenu] = useState(false); // 右上の追加ボタンのドロップダウン
   const [showTaskModal, setShowTaskModal] = useState(false); // 新規タスク作成モーダル
   const [taskModalProjectId, setTaskModalProjectId] = useState(null); // タスク作成先のプロジェクトID
+  const [editingProjectId, setEditingProjectId] = useState(null); // プロジェクト名編集中のID
+  const [showImportModal, setShowImportModal] = useState(false); // テキストインポートモーダル
+  const [importText, setImportText] = useState(""); // インポートするテキスト
+  const [importProjectName, setImportProjectName] = useState(""); // インポート先プロジェクト名
   const [depDrag, setDepDrag] = useState(null); // 依存関係ドラッグ {fromTaskId, fromProjectId, mouseX, mouseY}
   const headerRef=useRef(null), sideRef=useRef(null), ganttRef=useRef(null), bodyRef=useRef(null), barRects=useRef({});
   const today = useMemo(()=>{const d=new Date();d.setHours(0,0,0,0);return d},[]);
   const DW = dayWidth;
   const zoomLevel = getZL(DW);
+
+  // zoomLevelに連動してcapModeを変更
+  useEffect(() => {
+    setCapMode(zoomLevel);
+    setCapOffset(0);
+  }, [zoomLevel]);
 
   // 前回保存時の状態を追跡（削除検知用）
   const prevProjectIdsRef = useRef(new Set());
@@ -781,6 +877,23 @@ export default function App() {
     });
   },[]);
 
+  // Move task to another project
+  const moveTaskToProject = useCallback((taskId, fromProjectId, toProjectId) => {
+    if (fromProjectId === toProjectId) return;
+    setProjects(ps => ps.map(p => {
+      if (p.id === fromProjectId) {
+        return { ...p, tasks: p.tasks.filter(t => t.id !== taskId) };
+      }
+      if (p.id === toProjectId) {
+        const taskToMove = ps.find(proj => proj.id === fromProjectId)?.tasks.find(t => t.id === taskId);
+        if (taskToMove) {
+          return { ...p, tasks: [...p.tasks, { ...taskToMove, projectId: toProjectId, dependencies: [] }] };
+        }
+      }
+      return p;
+    }));
+  }, []);
+
   // Delete project
   const deleteProject = useCallback((pid) => {
     const proj = projects.find(p => p.id === pid);
@@ -932,10 +1045,69 @@ export default function App() {
     };
     setProjects(ps=>[newProj,...ps]);
     setShowNewModal(false);
+    // 作成後すぐに名前を編集できるようにする
+    setTimeout(()=>setEditingProjectId(newId),50);
   },[today]);
 
+  // テキストからインポート
+  const importFromText = useCallback(() => {
+    if (!importText.trim() || !importProjectName.trim()) return;
+    const lines = importText.trim().split('\n');
+    const tasks = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      if (!line) { i++; continue; }
+      // 日付行をパース
+      const dateMatch = line.match(/^(\d{4}\/\d{2}\/\d{2})(?:\s*-\s*(\d{4}\/\d{2}\/\d{2}))?$/);
+      if (dateMatch) {
+        const startDate = new Date(dateMatch[1].replace(/\//g, '-'));
+        const endDate = dateMatch[2] ? new Date(dateMatch[2].replace(/\//g, '-')) : startDate;
+        i++;
+        if (i < lines.length) {
+          let taskName = lines[i].trim();
+          const isClient = taskName.startsWith('(') && taskName.endsWith(')');
+          const isMilestone = taskName.includes('〆');
+          if (isClient) taskName = taskName.slice(1, -1); // ()を除去
+          taskName = taskName.replace(/^〆/, '').trim(); // 〆を除去
+          tasks.push({ name: taskName, start: startDate, end: endDate, isMilestone, isClient });
+        }
+      }
+      i++;
+    }
+    if (tasks.length === 0) return;
+    const newId = Date.now();
+    const newProj = {
+      id: newId,
+      name: importProjectName,
+      client: "",
+      status: "active",
+      collapsed: false,
+      tasks: tasks.map((t, idx) => ({
+        id: newId + "-" + idx,
+        projectId: newId,
+        name: t.name,
+        phase: "design",
+        assignee: t.isClient ? "client" : null,
+        start: t.start,
+        end: t.end,
+        done: false,
+        taskStatus: "todo",
+        desc: "",
+        comments: [],
+        estimatedHours: null,
+        type: t.isMilestone ? "milestone" : undefined,
+        dependencies: [],
+      })),
+    };
+    setProjects(ps => [newProj, ...ps]);
+    setShowImportModal(false);
+    setImportText("");
+    setImportProjectName("");
+  }, [importText, importProjectName]);
+
   // Drag
-  const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end)}}));setDrag({task,type:type||"move",startX:e.clientX,active,od});setDragShift(0)},[selIds,projects]);
+  const startDrag = useCallback((e,task,type)=>{e.stopPropagation();e.preventDefault();let active=new Set(selIds);if(!active.has(task.id)){active=new Set([task.id]);setSelIds(active)}const od={};projects.forEach(p=>p.tasks.forEach(t=>{if(active.has(t.id))od[t.id]={start:new Date(t.start),end:new Date(t.end),projectId:t.projectId}}));setDrag({task,type:type||"move",startX:e.clientX,startY:e.clientY,active,od});setDragShift(0)},[selIds,projects]);
   useEffect(()=>{if(!drag)return;
     // 依存関係で連動するタスクを取得
     const getDependentTasks = (taskIds, allTasks) => {
@@ -955,7 +1127,33 @@ export default function App() {
     const allTasks = [];
     projects.forEach(p => p.tasks.forEach(t => allTasks.push(t)));
     const depTasks = drag.type==="move" ? getDependentTasks(Array.from(drag.active), allTasks) : new Set();
-    const onM=e=>{const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){return{...t,start:addDays(t.start,ds),end:addDays(t.end,ds)}}return t})})))};const onU=()=>{setDrag(null);setDragShift(0);setDragPos(null)};window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW,projects]);
+    let lastY=drag.startY;
+    const onM=e=>{lastY=e.clientY;const ds=Math.round((e.clientX-drag.startX)/DW);setDragShift(ds);if(ds!==0)setDragPos({x:e.clientX+16,y:e.clientY-28});else setDragPos(null);setProjects(p=>p.map(pr=>({...pr,tasks:pr.tasks.map(t=>{const o=drag.od[t.id];if(o){if(drag.type==="move")return{...t,start:addDays(o.start,ds),end:addDays(o.end,ds)};if(drag.type==="resize-right"&&t.id===drag.task.id){const ne=addDays(o.end,ds);return ne>=t.start?{...t,end:ne}:t}if(drag.type==="resize-left"&&t.id===drag.task.id){const ns=addDays(o.start,ds);return ns<=t.end?{...t,start:ns}:t}}else if(drag.type==="move"&&depTasks.has(t.id)&&ds>0){return{...t,start:addDays(t.start,ds),end:addDays(t.end,ds)}}return t})})))};
+    const onU=e=>{
+      // Y軸方向の移動で別のプロジェクトに移動（単一タスクのみ）
+      if(drag.type==="move"&&drag.active.size===1&&ganttRef.current&&bodyRef.current){
+        const ganttRect=ganttRef.current.getBoundingClientRect();
+        const headerHeight=zoomLevel==="day"?60:72;
+        const relY=lastY-ganttRect.top+ganttRef.current.scrollTop-headerHeight;
+        let curY=0;let targetProjId=null;
+        for(const row of rowList){
+          const h=row.type==="project"||row.type==="member"?44:36;
+          if(relY>=curY&&relY<curY+h){
+            if(row.type==="project")targetProjId=row.project.id;
+            else if(row.type==="task")targetProjId=row.project?.id;
+            break;
+          }
+          curY+=h;
+        }
+        const taskId=Array.from(drag.active)[0];
+        const origProjId=drag.od[taskId]?.projectId;
+        if(targetProjId&&origProjId&&targetProjId!==origProjId){
+          moveTaskToProject(taskId,origProjId,targetProjId);
+        }
+      }
+      setDrag(null);setDragShift(0);setDragPos(null);
+    };
+    window.addEventListener("mousemove",onM);window.addEventListener("mouseup",onU);return()=>{window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU)}},[drag,DW,projects,rowList,moveTaskToProject]);
 
   // Zoom - 非passiveリスナーでブラウザズームを無効化（Mac trackpad対応）
   const handleWheel = useCallback(e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const g=ganttRef.current;if(!g)return;const rect=g.getBoundingClientRect(),mx=e.clientX-rect.left,sl=g.scrollLeft,md=(sl+mx)/DW;const f=e.deltaY<0?1.15:0.87;const nDW=clamp(DW*f,MIN_DW,MAX_DW);setDayWidth(nDW);requestAnimationFrame(()=>{if(ganttRef.current)ganttRef.current.scrollLeft=md*nDW-mx})},[DW]);
@@ -1111,12 +1309,20 @@ export default function App() {
   useEffect(()=>{const h=e=>{
     if(e.key==="Escape"){if(openTid)setOpenTid(null);else clearSel()}
     if((e.key==="Delete"||e.key==="Backspace")&&selIds.size>0&&!openTid&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();deleteSelectedTasks()}
-  };window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid,selIds,deleteSelectedTasks]);
+    // Undo/Redo (Cmd+Z / Cmd+Shift+Z on Mac, Ctrl+Z / Ctrl+Shift+Z on Windows)
+    if((e.metaKey||e.ctrlKey)&&e.key==="z"&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();if(e.shiftKey){redo()}else{undo()}}
+  };window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[clearSel,openTid,selIds,deleteSelectedTasks,undo,redo]);
   // グローバルクリックでドロップダウンを閉じる
   useEffect(()=>{if(!showAddMenu)return;const h=()=>setShowAddMenu(false);setTimeout(()=>window.addEventListener("click",h),0);return()=>window.removeEventListener("click",h)},[showAddMenu]);
 
   const capPeriod = useMemo(()=>{
-    if(capMode==="week"){
+    if(capMode==="day"){
+      const ws=addDays(today,capOffset);
+      const we=ws;
+      const label=capOffset===0?"今日":capOffset>0?(capOffset===1?"明日":capOffset+"日後"):(capOffset===-1?"昨日":Math.abs(capOffset)+"日前");
+      const dn=["日","月","火","水","木","金","土"][ws.getDay()];
+      return{start:ws,end:we,label,dateLabel:(ws.getMonth()+1)+"/"+ws.getDate()+"("+dn+")"};
+    }else if(capMode==="week"){
       const baseWeek=getMon(today);
       const ws=addDays(baseWeek,capOffset*7);
       const we=addDays(ws,4);
@@ -1132,10 +1338,10 @@ export default function App() {
   },[today,capMode,capOffset]);
   const capData = useMemo(()=>{
     const ws=capPeriod.start,we=capPeriod.end;
-    const workDaysInPeriod=capMode==="week"?5:Math.round((we-ws)/(864e5*7)*5);
+    const workDaysInPeriod=capMode==="day"?1:(capMode==="week"?5:Math.round((we-ws)/(864e5*7)*5));
     return TEAM.map(m=>{
       const mt=[];
-      const hpPeriod=capMode==="week"?m.hpw:Math.round(m.hpw*workDaysInPeriod/5);
+      const hpPeriod=capMode==="day"?Math.round(m.hpw/5):(capMode==="week"?m.hpw:Math.round(m.hpw*workDaysInPeriod/5));
       projects.forEach(p=>p.tasks.forEach(t=>{
         if(t.assignee===m.id&&t.type!=="milestone"){
           const s=new Date(t.start),e=new Date(t.end);
@@ -1154,6 +1360,106 @@ export default function App() {
       return{...m,tasks:mt,totalHours:Math.round(th*10)/10,util:Math.min(100,Math.round(th/hpPeriod*100)),hpPeriod};
     });
   },[projects,capPeriod,capMode]);
+
+  // ヘッダー表示用：各期間（週/月）のキャパシティ計算
+  const headerCapacities = useMemo(()=>{
+    if(zoomLevel==="day")return{}; // 日表示では使わない
+    const caps={};
+    // 社内メンバーのみのキャパシティを計算
+    const internalTeam=TEAM.filter(m=>m.type==="internal");
+    const totalWeeklyHours=internalTeam.reduce((s,m)=>s+m.hpw,0);
+
+    headerRows.bot.forEach(col=>{
+      let weekStart,weekEnd;
+      if(zoomLevel==="week"){
+        weekStart=new Date(col.key);
+        weekEnd=addDays(weekStart,4);
+      }else{
+        // 月表示
+        const parts=col.key.split("-");
+        weekStart=new Date(parseInt(parts[0]),parseInt(parts[1]),1);
+        weekEnd=new Date(parseInt(parts[0]),parseInt(parts[1])+1,0);
+      }
+
+      const workDaysInPeriod=zoomLevel==="week"?5:Math.round((weekEnd-weekStart)/(864e5*7)*5);
+      const periodCapacity=zoomLevel==="week"?totalWeeklyHours:Math.round(totalWeeklyHours*workDaysInPeriod/5);
+
+      let totalWorkload=0;
+      internalTeam.forEach(m=>{
+        projects.forEach(p=>p.tasks.forEach(t=>{
+          if(t.assignee===m.id&&t.type!=="milestone"){
+            const s=new Date(t.start),e=new Date(t.end);
+            if(s<=weekEnd&&e>=weekStart){
+              const os=s>weekStart?s:weekStart,oe=e<weekEnd?e:weekEnd;
+              let dInPeriod=0;
+              const cur=new Date(os);
+              while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              const totalDays=diffD(t.start,t.end)+1;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              totalWorkload+=hours;
+            }
+          }
+        }));
+      });
+
+      const util=periodCapacity>0?Math.round(totalWorkload/periodCapacity*100):0;
+      caps[col.key]={workload:Math.round(totalWorkload),capacity:periodCapacity,util};
+    });
+    return caps;
+  },[headerRows.bot,projects,zoomLevel]);
+
+  // メンバーごとの週別ワークロード計算（メンバービュー用）
+  const memberWorkloads = useMemo(()=>{
+    if(view!=="timeline"||zoomLevel==="day")return{};
+    const result={};
+    TEAM.forEach(m=>{
+      result[m.id]={};
+      const weeklyCapacity=m.hpw; // 週あたりのキャパシティ
+      headerRows.bot.forEach(col=>{
+        let periodStart,periodEnd;
+        if(zoomLevel==="week"){
+          periodStart=new Date(col.key);
+          periodEnd=addDays(periodStart,4);
+        }else{
+          const parts=col.key.split("-");
+          periodStart=new Date(parseInt(parts[0]),parseInt(parts[1]),1);
+          periodEnd=new Date(parseInt(parts[0]),parseInt(parts[1])+1,0);
+        }
+
+        const workDaysInPeriod=zoomLevel==="week"?5:Math.round((periodEnd-periodStart)/(864e5*7)*5);
+        const periodCapacity=zoomLevel==="week"?weeklyCapacity:Math.round(weeklyCapacity*workDaysInPeriod/5);
+
+        let workload=0;
+        projects.forEach(p=>p.tasks.forEach(t=>{
+          if(t.assignee===m.id&&t.type!=="milestone"){
+            const s=new Date(t.start),e=new Date(t.end);
+            if(s<=periodEnd&&e>=periodStart){
+              const os=s>periodStart?s:periodStart,oe=e<periodEnd?e:periodEnd;
+              let dInPeriod=0;
+              const cur=new Date(os);
+              while(cur<=oe){if(cur.getDay()!==0&&cur.getDay()!==6)dInPeriod++;cur.setDate(cur.getDate()+1)}
+              const totalDays=diffD(t.start,t.end)+1;
+              const hours=t.estimatedHours!=null?t.estimatedHours*(dInPeriod/(totalDays*5/7)):dInPeriod*8;
+              workload+=hours;
+            }
+          }
+        }));
+
+        const util=periodCapacity>0?Math.round(workload/periodCapacity*100):0;
+        result[m.id][col.key]={workload:Math.round(workload*10)/10,capacity:periodCapacity,util,left:0,width:col.width};
+      });
+
+      // 列の位置を計算
+      let left=0;
+      headerRows.bot.forEach(col=>{
+        if(result[m.id][col.key]){
+          result[m.id][col.key].left=left;
+        }
+        left+=col.width;
+      });
+    });
+    return result;
+  },[view,zoomLevel,headerRows.bot,projects]);
 
   useEffect(()=>{const pos={};let rowY=0;rowList.forEach(row=>{if(row.type==="project"||row.type==="member"){rowY+=44;return}const t=row.task;const left=getPos(t.start),right=getPos(t.end)+DW;if(t.type==="milestone")pos[t.id]={left,right:left+24,top:rowY+6,bottom:rowY+30};else pos[t.id]={left,right,top:rowY+7,bottom:rowY+29};rowY+=36});barRects.current=pos},[rowList,getPos,DW]);
 
@@ -1240,7 +1546,15 @@ export default function App() {
               <button onClick={()=>{setShowTaskModal(true);setShowAddMenu(false)}} style={{width:"100%",padding:"10px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:13,borderRadius:4,display:"flex",alignItems:"center",gap:10}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <span style={{fontSize:16}}>{"✏️"}</span><span>新規タスク</span>
               </button>
+              <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
+              <button onClick={()=>{setShowImportModal(true);setShowAddMenu(false)}} style={{width:"100%",padding:"10px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:13,borderRadius:4,display:"flex",alignItems:"center",gap:10}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{fontSize:16}}>{"📋"}</span><span>テキストからインポート</span>
+              </button>
             </div>}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:2,marginRight:8}}>
+            <button onClick={undo} disabled={!canUndo} title="元に戻す (Cmd+Z)" style={{...ST.btnI,padding:"4px 8px",opacity:canUndo?1:0.4,cursor:canUndo?"pointer":"not-allowed"}}>{"↩"}</button>
+            <button onClick={redo} disabled={!canRedo} title="やり直す (Cmd+Shift+Z)" style={{...ST.btnI,padding:"4px 8px",opacity:canRedo?1:0.4,cursor:canRedo?"pointer":"not-allowed"}}>{"↪"}</button>
           </div>
           {saving&&<span style={{fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",gap:4}}>保存中...</span>}
           {saveError&&<span style={{fontSize:11,color:"#ef4444",display:"flex",alignItems:"center",gap:4}} title={saveError}>⚠️ 保存エラー</span>}
@@ -1251,7 +1565,10 @@ export default function App() {
       <div style={ST.fbar}>
         <span style={{fontSize:11,color:"#6b7280",marginRight:4}}>担当:</span>
         <button style={ST.chip(!filterA)} onClick={()=>setFilterA(null)}>全員</button>
-        {TEAM.map(m=><button key={m.id} style={ST.chip(filterA===m.id,m.color)} onClick={()=>setFilterA(filterA===m.id?null:m.id)}>{m.name}</button>)}
+        {TEAM.filter(m=>m.type==="internal").map(m=><button key={m.id} style={ST.chip(filterA===m.id,m.color)} onClick={()=>setFilterA(filterA===m.id?null:m.id)}>{m.name}</button>)}
+        <div style={{width:1,height:20,background:"#e5e7eb",margin:"0 4px"}}/>
+        <span style={{fontSize:10,color:"#9ca3af",marginRight:4}}>社外:</span>
+        {TEAM.filter(m=>m.type==="external").map(m=><button key={m.id} style={{...ST.chip(filterA===m.id,m.color),borderStyle:"dashed"}} onClick={()=>setFilterA(filterA===m.id?null:m.id)}>{m.name}</button>)}
         <div style={{width:1,height:20,background:"#e5e7eb"}}/>
         <span style={{fontSize:11,color:"#6b7280",marginRight:4}}>状態:</span>
         <button style={ST.chip(!filterS)} onClick={()=>setFilterS(null)}>すべて</button>
@@ -1271,10 +1588,10 @@ export default function App() {
               <div style={{padding:"16px",fontSize:11,fontWeight:600,color:"#6b7280",borderBottom:"1px solid #e5e7eb",height:60,boxSizing:"border-box",display:"flex",alignItems:"center"}}>{view==="timeline"?"メンバー別":"案件一覧"} ({filtered.length})</div>
               <div style={{flex:1,overflowY:"auto"}} ref={sideRef} onScroll={e=>{if(ganttRef.current)ganttRef.current.scrollTop=e.target.scrollTop}}>
                 {rowList.map(row=>{
-                  if(row.type==="project"){const p=row.project;const isDragOver=dragOverProjId===p.id&&dragProjId!==p.id;return(<div key={"p-"+p.id} draggable onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/><div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
+                  if(row.type==="project"){const p=row.project;const isDragOver=(dragOverProjId===p.id&&dragProjId!==p.id)||(dragTaskId&&dragOverProjId===p.id&&dragTaskFromProjId!==p.id);const isEditing=editingProjectId===p.id;return(<div key={"p-"+p.id} draggable={!isEditing} onDragStart={()=>setDragProjId(p.id)} onDragEnd={()=>{if(dragProjId&&dragOverProjId)moveProject(dragProjId,dragOverProjId);setDragProjId(null);setDragOverProjId(null);if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject(dragTaskId,dragTaskFromProjId,dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null)}} onDragOver={e=>{e.preventDefault();setDragOverProjId(p.id)}} onDragLeave={()=>setDragOverProjId(null)} onContextMenu={e=>handleContextMenu(e,'project',p.id)} onDoubleClick={()=>setEditingProjectId(p.id)} style={{...ST.prow(true),opacity:dragProjId===p.id?0.5:1,background:isDragOver?"rgba(99,102,241,.15)":"#f9fafb",borderTop:isDragOver?"2px solid #6366f1":"none"}}><div style={{width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#9ca3af",fontSize:10,flexShrink:0}}>{"⋮⋮"}</div><div style={ST.tog(!p.collapsed)} onClick={()=>togProj(p.id)}>{"▶"}</div><div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.status==="active"?"#10b981":"#f59e0b"}}/>{isEditing?<input autoFocus value={p.name} onChange={e=>setProjects(ps=>ps.map(x=>x.id===p.id?{...x,name:e.target.value}:x))} onBlur={()=>setEditingProjectId(null)} onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingProjectId(null)}} onClick={e=>e.stopPropagation()} style={{flex:1,padding:"2px 6px",fontSize:13,fontWeight:600,border:"1px solid #6366f1",borderRadius:4,outline:"none",background:"#fff"}}/>:<div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>selProject(p.id)}>{p.name}</div>}<span style={{fontSize:10,color:"#6b7280"}}>{p.tasks.length}</span></div>)}
                   if(row.type==="member"){const m=row.member;return(<div key={"m-"+m.id} style={{...ST.prow(true),gap:8}}><div style={ST.tav(m.color)}>{m.av}</div><div style={{flex:1}}>{m.name}</div><span style={{fontSize:10,color:"#6b7280"}}>{row.count}</span></div>)}
-                  const t=row.task;const m=TEAM.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);const pName=row.project?.name||"";
-                  return(<div key={"t-"+t.id} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{})}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
+                  const t=row.task;const m=TEAM.find(x=>x.id===t.assignee);const isSel=selIds.has(t.id);const pName=row.project?.name||"";const isDraggingTask=dragTaskId===t.id;
+                  return(<div key={"t-"+t.id} draggable onDragStart={e=>{e.stopPropagation();setDragTaskId(t.id);setDragTaskFromProjId(row.project?.id)}} onDragEnd={()=>{if(dragTaskId&&dragOverProjId&&dragTaskFromProjId!==dragOverProjId){moveTaskToProject(dragTaskId,dragTaskFromProjId,dragOverProjId)}setDragTaskId(null);setDragTaskFromProjId(null);setDragOverProjId(null)}} style={{...ST.prow(false),paddingLeft:36,...(isSel?{background:"rgba(99,102,241,.08)"}:{}),opacity:isDraggingTask?0.5:1,cursor:"grab"}} onClick={e=>toggleSel(t.id,e)} onDoubleClick={()=>setOpenTid(t.id)} onContextMenu={e=>handleContextMenu(e,'task',t.id,row.project?.id)}>
                     {t.done&&<span style={{color:"#10b981",fontSize:10,flexShrink:0}}>{"✓"}</span>}
                     <div style={{width:6,height:6,borderRadius:2,flexShrink:0,background:PH[t.phase]?.c}}/>
                     <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",opacity:t.done?0.5:1}}>{t.name||"新規タスク"}{view==="timeline"&&<span style={{color:"#9ca3af",marginLeft:6}}>{pName}</span>}</div>
@@ -1285,9 +1602,23 @@ export default function App() {
             </div>
 
             <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden",background:"#f8f7f4"}}>
-              <div ref={headerRef} style={{flexShrink:0,overflow:"hidden",height:60}}>
+              <div ref={headerRef} style={{flexShrink:0,overflow:"hidden",height:zoomLevel==="day"?60:72}}>
                 <div style={{display:"flex"}}>{headerRows.top.map((g,i)=><div key={i} style={{fontSize:11,fontWeight:600,color:"#6b7280",padding:"6px 0 2px 8px",borderBottom:"1px solid #e5e7eb",background:"#fff",width:g.width,minWidth:g.width,overflow:"hidden",whiteSpace:"nowrap"}}>{g.width>40?g.label:""}</div>)}</div>
-                <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"6px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>{zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>:<span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{col.width>20?col.label:""}</span>}</div>))}</div>
+                <div style={{display:"flex"}}>{headerRows.bot.map((col,i)=>{
+                  const cap=zoomLevel!=="day"?headerCapacities[col.key]:null;
+                  const capColor=cap?(cap.util>100?"#ef4444":cap.util>80?"#f59e0b":"#10b981"):"#10b981";
+                  return(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",fontSize:zoomLevel==="day"?10:11,color:col.isToday?"#6366f1":"#6b7280",fontWeight:col.isToday?700:400,padding:zoomLevel==="day"?"2px 0 6px":"4px 2px 2px",borderRight:"1px solid #e5e7eb",flexShrink:0,width:col.width,minWidth:col.width,boxSizing:"border-box",background:col.isWE?"#f9fafb":"#fff",opacity:col.isWE&&!col.isToday?0.6:1,overflow:"hidden"}}>
+                    {zoomLevel==="day"?<React.Fragment><span style={{fontSize:9,marginBottom:1}}>{col.sub}</span><span style={{fontSize:11,fontWeight:500}}>{col.label}</span></React.Fragment>
+                    :<React.Fragment>
+                      <span style={{fontSize:10,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{col.width>20?col.label:""}</span>
+                      {cap&&col.width>=40&&<div style={{width:"calc(100% - 8px)",height:10,background:"#e5e7eb",borderRadius:2,overflow:"hidden",position:"relative"}} title={`${cap.workload}h / ${cap.capacity}h (${cap.util}%)`}>
+                        <div style={{position:"absolute",left:0,top:0,bottom:0,width:Math.min(100,cap.util)+"%",background:capColor,borderRadius:2,transition:"width 0.3s"}}/>
+                        {col.width>=60&&<span style={{position:"absolute",left:"50%",top:0,transform:"translateX(-50%)",fontSize:8,fontWeight:600,color:cap.util>50?"#fff":"#6b7280",lineHeight:"10px"}}>{cap.util}%</span>}
+                      </div>}
+                      {cap&&col.width<40&&col.width>=20&&<div style={{width:6,height:6,borderRadius:"50%",background:capColor}} title={`${cap.util}%`}/>}
+                    </React.Fragment>}
+                  </div>);
+                })}</div>
               </div>
               <div style={{flex:1,overflow:"auto",position:"relative"}} ref={ganttRef} onWheel={handleWheel} onScroll={e=>{if(headerRef.current)headerRef.current.scrollLeft=e.target.scrollLeft;if(sideRef.current)sideRef.current.scrollTop=e.target.scrollTop}}>
                 <div ref={bodyRef} style={{width:totalWidth,position:"relative",cursor:mActive?"crosshair":"default"}} onMouseDown={handleMStart} onDoubleClick={handleBodyDblClick}>
@@ -1305,7 +1636,22 @@ export default function App() {
                     })}
                   </svg>}
                   {rowList.map(row=>{
-                    if(row.type==="project"||row.type==="member")return<div key={"gr-"+(row.project?.id||row.member?.id)} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
+                    if(row.type==="project")return<div key={"gr-"+row.project?.id} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa"}}/>;
+                    if(row.type==="member"){
+                      const m=row.member;
+                      const mw=memberWorkloads[m.id]||{};
+                      const maxUtil=Math.max(100,...Object.values(mw).map(w=>w.util||0));
+                      return(<div key={"gr-"+m.id} style={{display:"flex",position:"relative",height:44,borderBottom:"1px solid #e5e7eb",background:"#fafafa",alignItems:"flex-end"}}>
+                        {zoomLevel!=="day"&&Object.entries(mw).map(([key,w])=>{
+                          const barHeight=maxUtil>0?Math.max(2,(w.util/maxUtil)*32):0;
+                          const capColor=w.util>100?"#ef4444":w.util>80?"#f59e0b":m.color||"#10b981";
+                          return(<div key={key} style={{position:"absolute",left:w.left,width:w.width,bottom:4,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+                            <div style={{width:"calc(100% - 4px)",height:barHeight,background:capColor,opacity:0.6,borderRadius:"2px 2px 0 0"}} title={`${w.workload}h / ${w.capacity}h (${w.util}%)`}/>
+                            {w.width>=50&&<span style={{fontSize:8,color:w.util>100?"#ef4444":w.util>80?"#f59e0b":"#6b7280",fontWeight:w.util>80?600:400}}>{w.workload}h</span>}
+                          </div>);
+                        })}
+                      </div>);
+                    }
                     const t=row.task,left=getPos(t.start),right=getPos(t.end)+DW,width=Math.max(4,right-left);
                     const ph=PH[t.phase]||{c:"#666"};const isMs=t.type==="milestone";const mem=TEAM.find(x=>x.id===t.assignee);
                     const barColor=mem?.color||"#9ca3af"; // 担当者の色、未設定はグレー
@@ -1337,10 +1683,7 @@ export default function App() {
           <div style={ST.cap}>
             <div style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                <div style={{display:"flex",gap:2,background:"#f3f4f6",borderRadius:6,padding:2}}>
-                  <button style={{padding:"4px 10px",borderRadius:4,fontSize:10,fontWeight:500,cursor:"pointer",border:"none",background:capMode==="week"?"#e5e7eb":"transparent",color:capMode==="week"?"#1f2937":"#6b7280"}} onClick={()=>{setCapMode("week");setCapOffset(0)}}>週</button>
-                  <button style={{padding:"4px 10px",borderRadius:4,fontSize:10,fontWeight:500,cursor:"pointer",border:"none",background:capMode==="month"?"#e5e7eb":"transparent",color:capMode==="month"?"#1f2937":"#6b7280"}} onClick={()=>{setCapMode("month");setCapOffset(0)}}>月</button>
-                </div>
+                <div style={{padding:"4px 10px",borderRadius:6,fontSize:10,fontWeight:500,background:"#e5e7eb",color:"#1f2937"}}>{capMode==="day"?"日":capMode==="week"?"週":"月"}表示</div>
               </div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <button style={{width:24,height:24,border:"1px solid #e5e7eb",borderRadius:4,background:"#fff",cursor:"pointer",fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setCapOffset(o=>o-1)}>{"◀"}</button>
@@ -1350,9 +1693,10 @@ export default function App() {
                 </div>
                 <button style={{width:24,height:24,border:"1px solid #e5e7eb",borderRadius:4,background:"#fff",cursor:"pointer",fontSize:11,color:"#6b7280",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setCapOffset(o=>o+1)}>{"▶"}</button>
               </div>
-              {capOffset!==0&&<button style={{marginTop:8,width:"100%",padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:4,background:"#fff",cursor:"pointer",fontSize:10,color:"#6366f1"}} onClick={()=>setCapOffset(0)}>{capMode==="week"?"今週":"今月"}に戻る</button>}
+              {capOffset!==0&&<button style={{marginTop:8,width:"100%",padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:4,background:"#fff",cursor:"pointer",fontSize:10,color:"#6366f1"}} onClick={()=>setCapOffset(0)}>{capMode==="day"?"今日":capMode==="week"?"今週":"今月"}に戻る</button>}
             </div>
-            {capData.map(m=>(
+            <div style={{padding:"8px 16px",background:"#f9fafb",borderBottom:"1px solid #e5e7eb",fontSize:11,fontWeight:600,color:"#6b7280"}}>社内メンバー</div>
+            {capData.filter(m=>m.type==="internal").map(m=>(
               <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:10,color:"#6b7280"}}>{m.role}</div></div></div>
                 <div style={{height:6,background:"#e5e7eb",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
@@ -1360,11 +1704,22 @@ export default function App() {
                 <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#4b5563"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#6b7280",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>タスクなし</div>}</div>
               </div>
             ))}
+            {capData.some(m=>m.type==="external")&&<React.Fragment>
+              <div style={{padding:"8px 16px",background:"#f0f9ff",borderBottom:"1px solid #e5e7eb",fontSize:11,fontWeight:600,color:"#0ea5e9"}}>社外パートナー</div>
+              {capData.filter(m=>m.type==="external").map(m=>(
+                <div key={m.id} style={{padding:"12px 16px",borderBottom:"1px solid #e5e7eb"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0,background:m.color,border:"2px dashed #fff",boxShadow:"0 0 0 2px "+m.color}}>{m.av}</div><div><div style={{fontSize:13,fontWeight:500,color:"#1f2937"}}>{m.name}</div><div style={{fontSize:10,color:"#6b7280"}}>{m.role}</div></div></div>
+                  <div style={{height:6,background:"#e5e7eb",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",borderRadius:3,width:m.util+"%",background:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981"}}/></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#6b7280"}}><span>{m.totalHours}h / {m.hpPeriod}h</span><span style={{color:m.util>90?"#ef4444":m.util>70?"#f59e0b":"#10b981",fontWeight:600}}>{m.util}%</span></div>
+                  <div style={{marginTop:8}}>{m.tasks.map((t,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:11,color:"#4b5563"}}><div style={{width:5,height:5,borderRadius:2,flexShrink:0,background:t.color}}/><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span><span style={{color:"#6b7280",flexShrink:0}}>{t.hours}h</span></div>))}{m.tasks.length===0&&<div style={{fontSize:11,color:"#6b7280",padding:"4px 0"}}>タスクなし</div>}</div>
+                </div>
+              ))}
+            </React.Fragment>}
           </div>
         )}
       </div>
 
-      {openTask&&<TaskPanel task={openTask.task} project={openTask.project} projectTasks={openTask.projectTasks} setProjects={setProjects} onClose={()=>setOpenTid(null)}/>}
+      {openTask&&<TaskPanel task={openTask.task} project={openTask.project} projectTasks={openTask.projectTasks} projects={projects} setProjects={setProjects} onClose={()=>setOpenTid(null)}/>}
       {openTask&&<div onClick={()=>setOpenTid(null)} style={{position:"fixed",top:0,left:0,right:440,bottom:0,zIndex:999,background:"rgba(0,0,0,.1)"}}/>}
 
       {dragPos&&dragShift!==0&&<div style={{position:"fixed",background:"#fff",border:"1px solid #6366f1",borderRadius:6,padding:"6px 12px",zIndex:200,pointerEvents:"none",fontSize:12,fontWeight:600,color:"#6366f1",boxShadow:"0 4px 12px rgba(0,0,0,.15)",whiteSpace:"nowrap",left:dragPos.x,top:dragPos.y}}>{dragShift>0?"+"+dragShift+"日 →":dragShift+"日 ←"}{selCount>1?" ("+selCount+"件)":""}</div>}
@@ -1388,12 +1743,37 @@ export default function App() {
             <button onClick={()=>{const p=projects.find(x=>x.id===ctxMenu.id);if(p){const name=prompt('案件名を入力',p.name);if(name){setProjects(ps=>ps.map(x=>x.id===ctxMenu.id?{...x,name}:x))}}setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 名前を編集"}</button>
             <button onClick={()=>deleteProject(ctxMenu.id)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,color:"#ef4444"}} onMouseEnter={e=>e.currentTarget.style.background="#fef2f2"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"🗑 削除"}</button>
           </React.Fragment>}
-          {ctxMenu.type==="task"&&(()=>{const task=projects.flatMap(p=>p.tasks).find(t=>t.id===ctxMenu.id);const isMilestone=task?.type==="milestone";return<React.Fragment>
+          {ctxMenu.type==="task"&&(()=>{const task=projects.flatMap(p=>p.tasks).find(t=>t.id===ctxMenu.id);const isMilestone=task?.type==="milestone";const targetIds=selIds.has(ctxMenu.id)&&selIds.size>1?Array.from(selIds):[ctxMenu.id];const isMulti=targetIds.length>1;return<React.Fragment>
+            {isMulti&&<div style={{padding:"6px 12px",fontSize:11,fontWeight:600,color:"#6366f1",background:"rgba(99,102,241,.08)",borderRadius:4,marginBottom:4}}>{targetIds.length}件選択中</div>}
             <button onClick={()=>{const newId=ctxMenu.projectId+"-"+Date.now();const newTask={id:newId,projectId:ctxMenu.projectId,name:"",phase:"wire",assignee:null,start:today,end:addDays(today,2),done:false,taskStatus:"inbox",desc:"",comments:[],estimatedHours:null};setProjects(ps=>ps.map(p=>p.id===ctxMenu.projectId?{...p,tasks:[...p.tasks,newTask]}:p));setOpenTid(newId);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"＋ タスクを追加"}</button>
-            <button onClick={()=>{setOpenTid(ctxMenu.id);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 編集"}</button>
+            {!isMulti&&<button onClick={()=>{setOpenTid(ctxMenu.id);setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"✏️ 編集"}</button>}
+            <div style={{position:"relative"}} onMouseEnter={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='block'} onMouseLeave={e=>e.currentTarget.querySelector('.submenu-assignee').style.display='none'}>
+              <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"👤 担当変更"}{isMulti&&<span style={{fontSize:10,color:"#6366f1"}}>({targetIds.length}件)</span>}<span style={{fontSize:10,color:"#9ca3af",marginLeft:"auto"}}>{"▶"}</span></button>
+              <div className="submenu-assignee" style={{display:"none",position:"absolute",left:"100%",top:0,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",minWidth:160,padding:4,marginLeft:4}}>
+                <button onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>targetIds.includes(t.id)?{...t,assignee:null}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,color:"#6b7280"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>未設定</button>
+                <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
+                {TEAM.filter(m=>m.type==="internal").map(m=>(
+                  <button key={m.id} onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>targetIds.includes(t.id)?{...t,assignee:m.id}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff"}}>{m.av}</div>{m.name}</button>
+                ))}
+                <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
+                <div style={{padding:"4px 12px",fontSize:10,color:"#9ca3af"}}>社外</div>
+                {TEAM.filter(m=>m.type==="external").map(m=>(
+                  <button key={m.id} onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>targetIds.includes(t.id)?{...t,assignee:m.id}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{width:20,height:20,borderRadius:"50%",background:m.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"#fff",border:"1px dashed #fff",boxShadow:"0 0 0 1px "+m.color}}>{m.av}</div>{m.name}</button>
+                ))}
+              </div>
+            </div>
             <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
             {isMilestone?<button onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>t.id===ctxMenu.id?{...t,type:undefined,end:addDays(t.start,2)}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📋 タスクに変換"}</button>
             :<button onClick={()=>{setProjects(ps=>ps.map(p=>({...p,tasks:p.tasks.map(t=>t.id===ctxMenu.id?{...t,type:"milestone",end:t.start}:t)})));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"◆ マイルストーンに変換"}</button>}
+            <div style={{position:"relative"}} onMouseEnter={e=>e.currentTarget.querySelector('.submenu').style.display='block'} onMouseLeave={e=>e.currentTarget.querySelector('.submenu').style.display='none'}>
+              <button style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,justifyContent:"space-between"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"📂 プロジェクト移動"}<span style={{fontSize:10,color:"#9ca3af"}}>{"▶"}</span></button>
+              <div className="submenu" style={{display:"none",position:"absolute",left:"100%",top:0,background:"#fff",border:"1px solid #e5e7eb",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,.15)",minWidth:160,padding:4,marginLeft:4}}>
+                {projects.filter(p=>p.id!==ctxMenu.projectId).map(p=>(
+                  <button key={p.id} onClick={()=>{setProjects(ps=>ps.map(proj=>{if(proj.id===ctxMenu.projectId)return{...proj,tasks:proj.tasks.filter(t=>t.id!==ctxMenu.id)};if(proj.id===p.id){const taskToMove=ps.flatMap(x=>x.tasks).find(t=>t.id===ctxMenu.id);return{...proj,tasks:[...proj.tasks,{...taskToMove,projectId:p.id,dependencies:[]}]};}return proj}));setCtxMenu(null)}} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} onMouseEnter={e=>e.currentTarget.style.background="#f3f4f6"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{p.name}</button>
+                ))}
+                {projects.filter(p=>p.id!==ctxMenu.projectId).length===0&&<div style={{padding:"8px 12px",fontSize:11,color:"#9ca3af"}}>他のプロジェクトがありません</div>}
+              </div>
+            </div>
             <div style={{height:1,background:"#e5e7eb",margin:"4px 0"}}/>
             <button onClick={()=>deleteTask(ctxMenu.id,ctxMenu.projectId)} style={{width:"100%",padding:"8px 12px",border:"none",background:"transparent",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:4,display:"flex",alignItems:"center",gap:8,color:"#ef4444"}} onMouseEnter={e=>e.currentTarget.style.background="#fef2f2"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{"🗑 削除"}</button>
           </React.Fragment>})()}
@@ -1455,7 +1835,7 @@ export default function App() {
 
       {delConfirm&&<React.Fragment>
         <div onClick={()=>setDelConfirm(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1200}}/>
-        <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"#fff",borderRadius:12,padding:24,zIndex:1201,width:360,boxShadow:"0 20px 50px rgba(0,0,0,.2)"}}>
+        <div tabIndex={-1} ref={el=>el&&el.focus()} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();confirmDelete()}else if(e.key==="Escape")setDelConfirm(null)}} style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"#fff",borderRadius:12,padding:24,zIndex:1201,width:360,boxShadow:"0 20px 50px rgba(0,0,0,.2)",outline:"none"}}>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
             <div style={{width:40,height:40,borderRadius:"50%",background:"#fef2f2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{"🗑"}</div>
             <div>
@@ -1469,6 +1849,34 @@ export default function App() {
           <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
             <button onClick={()=>setDelConfirm(null)} style={{padding:"10px 20px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:500,color:"#374151"}}>キャンセル</button>
             <button onClick={confirmDelete} style={{padding:"10px 20px",borderRadius:8,border:"none",background:"#ef4444",cursor:"pointer",fontSize:13,fontWeight:500,color:"#fff"}}>削除する</button>
+          </div>
+        </div>
+      </React.Fragment>}
+
+      {showImportModal&&<React.Fragment>
+        <div onClick={()=>{setShowImportModal(false);setImportText("");setImportProjectName("")}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:1100}}/>
+        <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"#fff",borderRadius:12,padding:24,zIndex:1101,width:500,maxHeight:"80vh",boxShadow:"0 20px 50px rgba(0,0,0,.2)",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <h2 style={{fontSize:18,fontWeight:600,color:"#1f2937",margin:0}}>テキストからインポート</h2>
+            <button onClick={()=>{setShowImportModal(false);setImportText("");setImportProjectName("")}} style={{width:28,height:28,border:"none",background:"#f3f4f6",borderRadius:6,cursor:"pointer",color:"#6b7280",fontSize:14}}>{"✕"}</button>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:12,fontWeight:600,color:"#6b7280",marginBottom:4,display:"block"}}>プロジェクト名</label>
+            <input value={importProjectName} onChange={e=>setImportProjectName(e.target.value)} placeholder="例: oneunity2パンフレット" style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e5e7eb",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{marginBottom:16,flex:1}}>
+            <label style={{fontSize:12,fontWeight:600,color:"#6b7280",marginBottom:4,display:"block"}}>タスクテキスト</label>
+            <textarea value={importText} onChange={e=>setImportText(e.target.value)} placeholder={"2026/02/20\n〆タスク名（マイルストーン）\n\n2026/02/23 - 2026/02/27\nタスク名（期間タスク）\n\n2026/03/04\n(クライアントタスク)"} style={{width:"100%",height:200,padding:"10px 12px",borderRadius:8,border:"1px solid #e5e7eb",fontSize:13,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box",lineHeight:1.5}}/>
+          </div>
+          <div style={{fontSize:11,color:"#6b7280",marginBottom:16,padding:12,background:"#f9fafb",borderRadius:8}}>
+            <div style={{fontWeight:600,marginBottom:4}}>フォーマット:</div>
+            <div>• 〆付き → マイルストーン</div>
+            <div>• ()で囲む → クライアント担当</div>
+            <div>• 日付範囲(YYYY/MM/DD - YYYY/MM/DD) → 期間タスク</div>
+          </div>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+            <button onClick={()=>{setShowImportModal(false);setImportText("");setImportProjectName("")}} style={{padding:"10px 20px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:500,color:"#374151"}}>キャンセル</button>
+            <button onClick={importFromText} disabled={!importText.trim()||!importProjectName.trim()} style={{padding:"10px 20px",borderRadius:8,border:"none",background:importText.trim()&&importProjectName.trim()?"#6366f1":"#d1d5db",cursor:importText.trim()&&importProjectName.trim()?"pointer":"not-allowed",fontSize:13,fontWeight:500,color:"#fff"}}>インポート</button>
           </div>
         </div>
       </React.Fragment>}
